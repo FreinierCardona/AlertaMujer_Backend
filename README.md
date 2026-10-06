@@ -1,8 +1,14 @@
 # AlertaMujer Backend
 
-Backend monolí­tico de AlertaMujer construido con Java y Spring Boot. Este
+Backend monolítico de AlertaMujer construido con Java y Spring Boot. Este
 repositorio contiene el arranque de la aplicación, su configuración base y
 pruebas de contexto; aún no incluye endpoints ni lógica de negocio.
+
+La aplicación consume exclusivamente el esquema PostgreSQL ya migrado por
+`AlertaMujer_Database`. Todas las configuraciones usan variables de entorno,
+`alertamujer_app`, `spring.liquibase.enabled=false` y
+`spring.jpa.hibernate.ddl-auto=validate`: el Backend no ejecuta migraciones ni
+crea, actualiza o elimina objetos de base de datos.
 
 ## Estructura modular
 
@@ -126,11 +132,16 @@ Para compilar y ejecutar las pruebas:
 .\mvnw.cmd clean verify
 ```
 
-La configuración local inicia sin conexión a base de datos. Liquibase está
-deshabilitado y Hibernate queda configurado para validar el esquema cuando se
-incorpore una conexión PostgreSQL ya migrada. No se incluyen secretos:
-use `.env.example` solo como referencia y mantenga los valores reales fuera
-del repositorio.
+La configuración local exige una conexión PostgreSQL ya migrada. Liquibase está
+deshabilitado y Hibernate valida el esquema existente al arrancar. No se
+incluyen secretos: use `.env.example` solo como referencia y mantenga los
+valores reales fuera del repositorio.
+
+Para ejecutar la validación real de persistencia, suministre las tres variables
+de datasource de `alertamujer_app` antes de ejecutar Maven. La prueba arranca
+el contexto contra esa base, confirma los siete schemas funcionales y verifica
+que el rol no puede crear objetos ni actualizar `databasechangelog`; no crea
+fixtures ni altera datos de integración.
 
 ## Docker
 
@@ -142,7 +153,7 @@ incluye ni inicia servicios de Base de Datos.
    procedimiento aprobado.
 2. Copie `.env.example` como `.env` y reemplace todos los marcadores. Use
    siempre `alertamujer_app` como `SPRING_DATASOURCE_USERNAME`.
-3. Declare una URL JDBC alcanzable desde el contenedor. Para la configuraciÃ³n
+3. Declare una URL JDBC alcanzable desde el contenedor. Para la configuración
    local por defecto, PostgreSQL se publica en el host y se usa
    `host.docker.internal:5434`.
 4. Inicie solo el Backend:
@@ -151,20 +162,20 @@ incluye ni inicia servicios de Base de Datos.
 docker compose up --build
 ```
 
-La salud tÃ©cnica estÃ¡ disponible en `http://localhost:8080/actuator/health`.
+La salud técnica está disponible en `http://localhost:8080/actuator/health`.
 El healthcheck de Compose comprueba esa ruta. La imagen falla antes de arrancar
 si falta una variable obligatoria o si el usuario JDBC no es
 `alertamujer_app`.
 
 La ruta `EVIDENCE_STORAGE_PATH` se monta sobre un volumen nombrado persistente.
 No se expone como ruta HTTP; el soporte de carga y descarga de evidencia se
-incorporarÃ¡ en su HU correspondiente.
+incorporará en su HU correspondiente.
 
 ### Base de Datos en Docker
 
 El Compose principal no presupone una red de Base de Datos. Si ambos
 repositorios se ejecutan en Docker, use la red externa creada por el repositorio
-de Base de Datos y una URL JDBC explÃ­cita:
+de Base de Datos y una URL JDBC explícita:
 
 ```powershell
 $env:DATABASE_NETWORK_NAME = 'alertamujer_db_network'
