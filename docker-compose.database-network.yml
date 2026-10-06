@@ -1,0 +1,9 @@
+services:
+  backend:
+    networks:
+      - database
+
+networks:
+  database:
+    name: ${DATABASE_NETWORK_NAME:?DATABASE_NETWORK_NAME is required for the Docker database topology}
+    external: true
