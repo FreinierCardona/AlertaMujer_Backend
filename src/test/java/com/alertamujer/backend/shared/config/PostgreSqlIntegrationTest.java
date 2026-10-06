@@ -1,6 +1,7 @@
 package com.alertamujer.backend.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.alertamujer.AlertaMujerApplication;
 import java.util.Map;
@@ -10,6 +11,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -58,6 +60,15 @@ class PostgreSqlIntegrationTest {
             assertThat(jdbc.queryForObject(
                     "select has_table_privilege(current_user, 'configuration.system_configuration', 'UPDATE')",
                     Boolean.class)).isFalse();
+            SystemConfigurationValues configuration = context.getBean(SystemConfigurationValues.class);
+            assertThat(configuration.heartbeatIntervalSeconds()).isPositive();
+            assertThat(configuration.offlineTimeoutSeconds())
+                    .isGreaterThan(configuration.heartbeatIntervalSeconds());
+            assertThatThrownBy(() -> jdbc.update("""
+                    update configuration.system_configuration
+                    set default_sos_message = default_sos_message
+                    where configuration_id = 1
+                    """)).isInstanceOf(DataAccessException.class);
             assertThat(jdbc.queryForObject(
                     "select has_table_privilege(current_user, 'public.databasechangelog', 'UPDATE')",
                     Boolean.class)).isFalse();
