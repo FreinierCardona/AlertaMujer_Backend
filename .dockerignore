@@ -1,0 +1,10 @@
+.git
+.github
+.vscode
+target
+.env
+.env.*
+!.env.example
+*.sql
+README.md
+HELP.md
