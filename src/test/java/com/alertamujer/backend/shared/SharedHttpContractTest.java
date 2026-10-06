@@ -115,7 +115,7 @@ class SharedHttpContractTest {
                 .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
 
         mockMvc.perform(get("/contract-test/business"))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().is(422))
                 .andExpect(jsonPath("$.code").value("RULE_VIOLATION"));
 
         mockMvc.perform(get("/contract-test/unexpected"))
