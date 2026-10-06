@@ -4,6 +4,106 @@ Backend monolí­tico de AlertaMujer construido con Java y Spring Boot. Este
 repositorio contiene el arranque de la aplicación, su configuración base y
 pruebas de contexto; aún no incluye endpoints ni lógica de negocio.
 
+## Estructura modular
+
+La aplicación usa una arquitectura **By Module + N capas**: cada módulo
+funcional concentra sus capas `controller`, `dto`, `service`, `repository` y
+`model`; `shared` concentra preocupaciones transversales. No se crean módulos
+de negocio alternos ni capas genéricas.
+
+La HU-API-003 establece este árbol bajo `com.alertamujer.backend`. Cada
+directorio de capa contiene un `.gitkeep` hasta que incorpore su primera clase;
+la estructura no contiene endpoints, entidades ni persistencia ficticia.
+
+```text
+src/main/java/com/alertamujer/
+├── AlertaMujerApplication.java
+└── backend/
+    ├── shared/
+    │   ├── config/
+    │   ├── security/
+    │   ├── errors/
+    │   ├── validation/
+    │   ├── audit/
+    │   └── observability/
+    ├── identity/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   └── model/
+    ├── contacts/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   └── model/
+    ├── emergency/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   └── model/
+    ├── notification/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   ├── model/
+    │   └── fcm/
+    ├── evidence/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   ├── model/
+    │   └── storage/
+    ├── chat/
+    │   ├── controller/
+    │   ├── dto/request/
+    │   ├── dto/response/
+    │   ├── service/
+    │   ├── service/impl/
+    │   ├── repository/
+    │   ├── model/
+    │   └── websocket/
+    └── administration/
+        ├── controller/
+        ├── dto/request/
+        ├── dto/response/
+        ├── service/
+        ├── service/impl/
+        ├── repository/
+        └── model/
+```
+
+| Paquete | Schemas y datos PostgreSQL que consumirá |
+| --- | --- |
+| `backend/shared` | `configuration.system_configuration` y `audit.audit_logs` para configuración y auditoría transversales. |
+| `backend/identity` | `identity.registration_requests`, `users`, `user_credentials`, `user_verification_codes`, `user_sessions`; `profile.user_emergency_settings`. |
+| `backend/contacts` | `contacts.emergency_contacts`. |
+| `backend/emergency` | `emergency.emergencies`, `emergency_locations`, `emergency_status_history`. |
+| `backend/notification` | `notification.user_device_tokens`, `emergency.emergency_notification_attempts`. |
+| `backend/evidence` | `emergency.emergency_evidences`; el archivo queda fuera de PostgreSQL. |
+| `backend/chat` | `emergency.emergency_chat_messages`. |
+| `backend/administration` | Consultas autorizadas sobre `identity`, `emergency` y `audit.audit_logs`; no posee tablas propias. |
+
+Responsabilidades obligatorias: un `controller` adapta HTTP y depende de un
+`service`, nunca de un `repository`; un `repository` solo consulta PostgreSQL
+y no decide permisos o transiciones; `service/impl` valida autorización y
+estado, y delimita la transacción. Las entidades JPA no se exponen en DTOs.
+Esta HU no crea rutas, entidades JPA, repositorios ni migraciones.
+
 ## Requisitos
 
 - Java 21
