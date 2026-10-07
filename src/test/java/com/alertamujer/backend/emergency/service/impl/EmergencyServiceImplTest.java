@@ -10,17 +10,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
+import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.UserData;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -105,9 +108,105 @@ class EmergencyServiceImplTest {
         assertThat(service.active(identity).emergencyId()).isEqualTo(emergencyId);
     }
 
+    @Test
+    void heartbeatRecoversOfflineAndAppendsTheNextHistoryEntryWhileHoldingTheOwnerEmergency() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData offline = new EmergencyData(emergencyId, "OFFLINE", "IN_PROGRESS", now.minusSeconds(300),
+                now.minusSeconds(200), null);
+        LocationInput location = location();
+        when(repository.lockOwnEmergency(emergencyId, userId)).thenReturn(Optional.of(offline));
+        when(repository.nextHistorySequence(emergencyId)).thenReturn(3);
+
+        service.heartbeat(identity, emergencyId, location);
+
+        verify(repository).insertLocation(emergencyId, location.latitude(), location.longitude(), location.accuracyMeters(),
+                location.capturedAt(), now);
+        verify(repository).updateHeartbeat(emergencyId, "IN_PROGRESS", null, now);
+        verify(repository).insertStatusHistory(emergencyId, 3, "OFFLINE", "IN_PROGRESS", userId, now);
+    }
+
+    @Test
+    void finalizedEmergencyRejectsNewLocationsAndNoLocationIsWritten() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData finalized = new EmergencyData(emergencyId, "FINALIZED", null, now.minusSeconds(300), now, now);
+        when(repository.lockOwnEmergency(emergencyId, userId)).thenReturn(Optional.of(finalized));
+
+        assertThatThrownBy(() -> service.recordLocation(identity, emergencyId, location()))
+                .isInstanceOf(StateConflictException.class);
+
+        verify(repository, never()).insertLocation(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void finishAppendsTerminalHistoryButARepeatedFinishIsIdempotent() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData active = new EmergencyData(emergencyId, "ACTIVE", null, now.minusSeconds(300), now, null);
+        when(repository.lockOwnEmergency(emergencyId, userId)).thenReturn(Optional.of(active));
+        when(repository.nextHistorySequence(emergencyId)).thenReturn(2);
+
+        service.finish(identity, emergencyId);
+
+        verify(repository).updateStatus(emergencyId, "FINALIZED", null, now, now);
+        verify(repository).insertStatusHistory(emergencyId, 2, "ACTIVE", "FINALIZED", userId, now);
+
+        EmergencyData finalized = new EmergencyData(emergencyId, "FINALIZED", null, now.minusSeconds(300), now, now);
+        when(repository.lockOwnEmergency(emergencyId, userId)).thenReturn(Optional.of(finalized));
+        service.finish(identity, emergencyId);
+        verify(repository).insertStatusHistory(emergencyId, 2, "ACTIVE", "FINALIZED", userId, now);
+    }
+
+    @Test
+    void timeoutPreservesOperationalStateAndDoesNotCreateALocation() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData active = new EmergencyData(emergencyId, "ACTIVE", null, now.minusSeconds(300),
+                now.minusSeconds(181), null);
+        when(repository.lockEmergency(emergencyId)).thenReturn(Optional.of(active));
+        when(repository.nextHistorySequence(emergencyId)).thenReturn(2);
+
+        service.markOfflineIfTimedOut(emergencyId);
+
+        verify(repository).updateStatus(emergencyId, "OFFLINE", "ACTIVE", null, now);
+        verify(repository).insertStatusHistory(emergencyId, 2, "ACTIVE", "OFFLINE", null, now);
+        verify(repository, never()).insertLocation(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void enabledAdministratorCanOnlyStartAttentionFromActiveAndTheTransitionIsRecorded() {
+        UUID emergencyId = UUID.randomUUID();
+        UUID administratorId = UUID.randomUUID();
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(administratorId, UUID.randomUUID(), "ENTITY_ADMIN", false);
+        EmergencyData active = new EmergencyData(emergencyId, "ACTIVE", null, now.minusSeconds(300), now, null);
+        when(repository.findEnabledAdministrator(administratorId)).thenReturn(Optional.of(new UserData(administratorId)));
+        when(repository.lockEmergency(emergencyId)).thenReturn(Optional.of(active));
+        when(repository.nextHistorySequence(emergencyId)).thenReturn(2);
+
+        service.startAttention(administrator, emergencyId);
+
+        verify(repository).updateStatus(emergencyId, "IN_PROGRESS", null, null, now);
+        verify(repository).insertStatusHistory(emergencyId, 2, "ACTIVE", "IN_PROGRESS", administratorId, now);
+    }
+
+    @Test
+    void ownHistoryUsesOnlyTheOwnerFinalizedPage() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData finalized = new EmergencyData(emergencyId, "FINALIZED", null, now.minusSeconds(300), now, now);
+        when(repository.findOwnFinalizedEmergencies(userId, 20, 0)).thenReturn(List.of(finalized));
+        when(repository.countOwnFinalizedEmergencies(userId)).thenReturn(1L);
+
+        var page = service.ownHistory(identity, 0, 20);
+
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.items()).extracting(response -> response.emergencyId()).containsExactly(emergencyId);
+    }
+
     private EmergencyCreateInput input(String message) {
         return new EmergencyCreateInput(new BigDecimal("4.609710"), new BigDecimal("-74.081750"),
                 new BigDecimal("8.5"), now.minusSeconds(2), message);
+    }
+
+    private LocationInput location() {
+        return new LocationInput(new BigDecimal("4.609710"), new BigDecimal("-74.081750"),
+                new BigDecimal("8.5"), now.minusSeconds(2));
     }
 
     private SystemConfigurationValues configuration() {
