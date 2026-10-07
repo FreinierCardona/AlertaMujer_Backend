@@ -3,6 +3,7 @@ package com.alertamujer.backend.emergency.service.impl;
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
+import com.alertamujer.backend.emergency.event.EmergencyCreatedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
 import com.alertamujer.backend.emergency.service.EmergencyService;
@@ -17,6 +18,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,16 +29,24 @@ class EmergencyServiceImpl implements EmergencyService {
     private final EmergencyRepository repository;
     private final SystemConfigurationValues configuration;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration) {
-        this(repository, configuration, Clock.systemUTC());
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration,
+            ApplicationEventPublisher eventPublisher) {
+        this(repository, configuration, Clock.systemUTC(), eventPublisher);
     }
 
     EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock) {
+        this(repository, configuration, clock, event -> { });
+    }
+
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock,
+            ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.configuration = configuration;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -62,6 +72,7 @@ class EmergencyServiceImpl implements EmergencyService {
         repository.insertInitialLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(),
                 input.capturedAt(), now);
         repository.insertInitialHistory(emergencyId, userId, now);
+        eventPublisher.publishEvent(new EmergencyCreatedEvent(emergencyId, message, input.latitude(), input.longitude()));
         return new CreationResult(new EmergencyResponse(emergencyId, "ACTIVE", null, now, null, null), true);
     }
 
