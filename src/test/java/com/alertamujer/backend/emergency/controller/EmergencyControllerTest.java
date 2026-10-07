@@ -76,6 +76,32 @@ class EmergencyControllerTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    void acceptsHeartbeatAndLocationUsingTheContractStatusCodes() throws Exception {
+        UUID emergencyId = UUID.randomUUID();
+        String body = """
+                {"latitude":4.609710,"longitude":-74.081750,"accuracyMeters":8.5,
+                  "capturedAt":"2026-10-07T17:59:58Z"}
+                """;
+
+        mockMvc.perform(post("/api/v1/emergencies/{emergencyId}/heartbeats", emergencyId)
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/v1/emergencies/{emergencyId}/locations", emergencyId)
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        verify(service).heartbeat(any(), org.mockito.ArgumentMatchers.eq(emergencyId), any());
+        verify(service).recordLocation(any(), org.mockito.ArgumentMatchers.eq(emergencyId), any());
+    }
+
+    @Test
+    void requiresAnExplicitSafeConfirmationBeforeFinishing() throws Exception {
+        mockMvc.perform(post("/api/v1/emergencies/{emergencyId}/finish", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON).content("{" + "\"confirmedSafe\":false}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
     private HandlerMethodArgumentResolver identityResolver() {
         return new HandlerMethodArgumentResolver() {
             @Override public boolean supportsParameter(MethodParameter parameter) {

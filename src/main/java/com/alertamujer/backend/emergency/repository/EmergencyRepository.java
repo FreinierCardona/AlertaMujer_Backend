@@ -27,6 +27,14 @@ public class EmergencyRepository {
         return enabledUser(userId, false);
     }
 
+    public Optional<UserData> findEnabledAdministrator(UUID userId) {
+        List<UserData> rows = jdbc.query("""
+                select user_id from identity.users
+                 where user_id = ? and role = 'ENTITY_ADMIN' and account_status = 'ENABLED'
+                """, (rs, row) -> new UserData(rs.getObject(1, UUID.class)), userId);
+        return rows.stream().findFirst();
+    }
+
     private Optional<UserData> enabledUser(UUID userId, boolean lock) {
         List<UserData> rows = jdbc.query("""
                 select user_id from identity.users
@@ -70,6 +78,22 @@ public class EmergencyRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<EmergencyData> lockOwnEmergency(UUID emergencyId, UUID userId) {
+        return lockedEmergency("where emergency_id = ? and user_id = ?", emergencyId, userId);
+    }
+
+    public Optional<EmergencyData> lockEmergency(UUID emergencyId) {
+        return lockedEmergency("where emergency_id = ?", emergencyId);
+    }
+
+    private Optional<EmergencyData> lockedEmergency(String condition, Object... args) {
+        List<EmergencyData> rows = jdbc.query("""
+                select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
+                  from emergency.emergencies
+                """ + condition + " for update", emergencyMapper(), args);
+        return rows.stream().findFirst();
+    }
+
     public boolean insertActiveEmergency(UUID emergencyId, UUID userId, String messageSnapshot, Instant now) {
         return jdbc.update("""
                 insert into emergency.emergencies (emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at)
@@ -79,6 +103,11 @@ public class EmergencyRepository {
     }
 
     public void insertInitialLocation(UUID emergencyId, BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyMeters,
+            Instant capturedAt, Instant receivedAt) {
+        insertLocation(emergencyId, latitude, longitude, accuracyMeters, capturedAt, receivedAt);
+    }
+
+    public void insertLocation(UUID emergencyId, BigDecimal latitude, BigDecimal longitude, BigDecimal accuracyMeters,
             Instant capturedAt, Instant receivedAt) {
         jdbc.update("""
                 insert into emergency.emergency_locations (location_id, emergency_id, latitude, longitude, accuracy_meters,
@@ -94,6 +123,65 @@ public class EmergencyRepository {
                     previous_status, new_status, actor_user_id, occurred_at)
                 values (?, ?, 1, null, 'ACTIVE', ?, ?)
                 """, UUID.randomUUID(), emergencyId, actorUserId, Timestamp.from(occurredAt));
+    }
+
+    public void updateHeartbeat(UUID emergencyId, String status, String previousOperationalStatus, Instant now) {
+        jdbc.update("""
+                update emergency.emergencies
+                   set status = ?,
+                       previous_operational_status = ?,
+                       last_heartbeat_at = ?,
+                       updated_at = ?
+                 where emergency_id = ?
+                """, status, previousOperationalStatus, Timestamp.from(now), Timestamp.from(now), emergencyId);
+    }
+
+    public void updateStatus(UUID emergencyId, String status, String previousOperationalStatus, Instant finalizedAt, Instant now) {
+        jdbc.update("""
+                update emergency.emergencies
+                   set status = ?,
+                       previous_operational_status = ?,
+                       finalized_at = ?,
+                       updated_at = ?
+                 where emergency_id = ?
+                """, status, previousOperationalStatus, timestamp(finalizedAt), Timestamp.from(now), emergencyId);
+    }
+
+    public int nextHistorySequence(UUID emergencyId) {
+        Integer sequence = jdbc.queryForObject("""
+                select coalesce(max(sequence_no), 0) + 1
+                  from emergency.emergency_status_history
+                 where emergency_id = ?
+                """, Integer.class, emergencyId);
+        return sequence == null ? 1 : sequence;
+    }
+
+    public void insertStatusHistory(UUID emergencyId, int sequenceNo, String previousStatus, String newStatus,
+            UUID actorUserId, Instant occurredAt) {
+        jdbc.update("""
+                insert into emergency.emergency_status_history (emergency_status_history_id, emergency_id, sequence_no,
+                    previous_status, new_status, actor_user_id, occurred_at)
+                values (?, ?, ?, ?, ?, ?, ?)
+                """, UUID.randomUUID(), emergencyId, sequenceNo, previousStatus, newStatus, actorUserId,
+                Timestamp.from(occurredAt));
+    }
+
+    public long countOwnFinalizedEmergencies(UUID userId) {
+        Long total = jdbc.queryForObject("""
+                select count(*) from emergency.emergencies
+                 where user_id = ? and status = 'FINALIZED'
+                """, Long.class, userId);
+        return total == null ? 0 : total;
+    }
+
+    public List<EmergencyData> findOwnFinalizedEmergencies(UUID userId, int limit, int offset) {
+        return jdbc.query("""
+                select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
+                  from emergency.emergencies
+                 where user_id = ? and status = 'FINALIZED'
+                 order by finalized_at desc, emergency_id desc
+                 limit ? offset ?
+                """, emergencyMapper(), userId, limit, offset);
     }
 
     public Optional<String> findValidEmergencyMessage(UUID userId) {
@@ -113,6 +201,10 @@ public class EmergencyRepository {
 
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
+    }
+
+    private static Timestamp timestamp(Instant value) {
+        return value == null ? null : Timestamp.from(value);
     }
 
     public record UserData(UUID id) { }

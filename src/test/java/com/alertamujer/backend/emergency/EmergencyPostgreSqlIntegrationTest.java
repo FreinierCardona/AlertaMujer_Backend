@@ -1,10 +1,13 @@
 package com.alertamujer.backend.emergency;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.alertamujer.AlertaMujerApplication;
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
+import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.service.EmergencyService;
+import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -100,9 +103,69 @@ class EmergencyPostgreSqlIntegrationTest {
         }
     }
 
+    @Test
+    void persistsTheLifecycleWithAppendOnlyHistoryAgainstTheMigratedApplicationGrants() {
+        String url = System.getenv("SPRING_DATASOURCE_URL");
+        String username = System.getenv("SPRING_DATASOURCE_USERNAME");
+        String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
+        Assumptions.assumeTrue(url != null && username != null && password != null,
+                "Integration database credentials were not supplied");
+
+        SpringApplication application = new SpringApplication(AlertaMujerApplication.class);
+        application.setWebApplicationType(WebApplicationType.NONE);
+        application.setDefaultProperties(Map.of("spring.profiles.active", "test", "spring.datasource.url", url,
+                "spring.datasource.username", username, "spring.datasource.password", password, "spring.main.banner-mode", "off"));
+        try (ConfigurableApplicationContext context = application.run()) {
+            JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
+            EmergencyService service = context.getBean(EmergencyService.class);
+            UUID owner = UUID.randomUUID();
+            UUID contact = UUID.randomUUID();
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            try {
+                insertUser(jdbc, owner, "@lifeownera" + suffix, suffix, 5);
+                insertUser(jdbc, contact, "@lifecontacta" + suffix, suffix, 6);
+                insertAcceptedContact(jdbc, owner, contact);
+                UUID emergencyId = service.createOrRecover(identity(owner), input()).emergency().emergencyId();
+
+                jdbc.update("update emergency.emergencies set last_heartbeat_at = current_timestamp - interval '181 seconds' where emergency_id = ?",
+                        emergencyId);
+                service.markOfflineIfTimedOut(emergencyId);
+                assertThat(status(jdbc, emergencyId)).isEqualTo("OFFLINE");
+                assertThat(jdbc.queryForObject("select previous_operational_status from emergency.emergencies where emergency_id = ?",
+                        String.class, emergencyId)).isEqualTo("ACTIVE");
+
+                service.heartbeat(identity(owner), emergencyId, location());
+                assertThat(status(jdbc, emergencyId)).isEqualTo("ACTIVE");
+                assertThat(jdbc.queryForObject("select count(*) from emergency.emergency_locations where emergency_id = ?",
+                        Integer.class, emergencyId)).isEqualTo(2);
+
+                service.recordLocation(identity(owner), emergencyId, location());
+                service.finish(identity(owner), emergencyId);
+                assertThat(status(jdbc, emergencyId)).isEqualTo("FINALIZED");
+                assertThat(jdbc.query("select sequence_no from emergency.emergency_status_history where emergency_id = ? order by sequence_no",
+                        (rs, row) -> rs.getInt(1), emergencyId)).containsExactly(1, 2, 3, 4);
+                assertThatThrownBy(() -> service.recordLocation(identity(owner), emergencyId, location()))
+                        .isInstanceOf(StateConflictException.class);
+                assertThatThrownBy(() -> jdbc.update("delete from emergency.emergency_status_history where emergency_id = ?", emergencyId))
+                        .isInstanceOf(Exception.class);
+            } finally {
+                jdbc.update("delete from identity.users where user_id in (?, ?)", owner, contact);
+            }
+        }
+    }
+
     private static EmergencyCreateInput input() {
         return new EmergencyCreateInput(new BigDecimal("4.609710"), new BigDecimal("-74.081750"), new BigDecimal("8.5"),
                 Instant.now().minusSeconds(2), null);
+    }
+
+    private static LocationInput location() {
+        return new LocationInput(new BigDecimal("4.610000"), new BigDecimal("-74.082000"), new BigDecimal("7.5"),
+                Instant.now().minusSeconds(1));
+    }
+
+    private static String status(JdbcTemplate jdbc, UUID emergencyId) {
+        return jdbc.queryForObject("select status from emergency.emergencies where emergency_id = ?", String.class, emergencyId);
     }
 
     private static AuthenticatedIdentity identity(UUID userId) {

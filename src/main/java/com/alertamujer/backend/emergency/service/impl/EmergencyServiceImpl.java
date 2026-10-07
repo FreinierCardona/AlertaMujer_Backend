@@ -1,6 +1,7 @@
 package com.alertamujer.backend.emergency.service.impl;
 
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
+import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
@@ -9,7 +10,9 @@ import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.ForbiddenException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.validation.PageResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -76,6 +79,92 @@ class EmergencyServiceImpl implements EmergencyService {
         return repository.findOwnEmergency(emergencyId, userId).map(this::response).orElseThrow(ResourceNotFoundException::new);
     }
 
+    @Override
+    @Transactional
+    public void heartbeat(AuthenticatedIdentity identity, UUID emergencyId, LocationInput input) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if ("FINALIZED".equals(emergency.status())) {
+            throw new StateConflictException();
+        }
+        Instant now = clock.instant();
+        repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(), now);
+        if ("OFFLINE".equals(emergency.status())) {
+            transition(emergency, emergency.previousOperationalStatus(), null, userId, now, true);
+        } else {
+            repository.updateHeartbeat(emergencyId, emergency.status(), null, now);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void recordLocation(AuthenticatedIdentity identity, UUID emergencyId, LocationInput input) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if (!isOperational(emergency.status())) {
+            throw new StateConflictException();
+        }
+        repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(),
+                clock.instant());
+    }
+
+    @Override
+    @Transactional
+    public void finish(AuthenticatedIdentity identity, UUID emergencyId) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if ("FINALIZED".equals(emergency.status())) {
+            return;
+        }
+        if (!isOperational(emergency.status())) {
+            throw new StateConflictException();
+        }
+        transition(emergency, "FINALIZED", null, userId, clock.instant(), false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<EmergencyResponse> ownHistory(AuthenticatedIdentity identity, int page, int size) {
+        UUID userId = requireEnabledUser(identity, false);
+        return new PageResponse<>(repository.findOwnFinalizedEmergencies(userId, size, page * size).stream()
+                .map(this::response).toList(), page, size, repository.countOwnFinalizedEmergencies(userId));
+    }
+
+    @Override
+    @Transactional
+    public void startAttention(AuthenticatedIdentity identity, UUID emergencyId) {
+        if (!"ENTITY_ADMIN".equals(identity.role())
+                || repository.findEnabledAdministrator(identity.userId()).isEmpty()) {
+            throw new ForbiddenException();
+        }
+        EmergencyData emergency = repository.lockEmergency(emergencyId).orElseThrow(ResourceNotFoundException::new);
+        if ("IN_PROGRESS".equals(emergency.status())) {
+            return;
+        }
+        if (!"ACTIVE".equals(emergency.status())) {
+            throw new StateConflictException();
+        }
+        transition(emergency, "IN_PROGRESS", null, identity.userId(), clock.instant(), false);
+    }
+
+    @Override
+    @Transactional
+    public void markOfflineIfTimedOut(UUID emergencyId) {
+        EmergencyData emergency = repository.lockEmergency(emergencyId).orElse(null);
+        if (emergency == null || !isOperational(emergency.status())) {
+            return;
+        }
+        Instant now = clock.instant();
+        Instant lastActivity = emergency.lastHeartbeatAt() == null ? emergency.startedAt() : emergency.lastHeartbeatAt();
+        if (lastActivity.plusSeconds(configuration.offlineTimeoutSeconds()).isAfter(now)) {
+            return;
+        }
+        transition(emergency, "OFFLINE", emergency.status(), null, now, false);
+    }
+
     private UUID requireEnabledUser(AuthenticatedIdentity identity, boolean lock) {
         if (!"USER".equals(identity.role())) {
             throw new ForbiddenException();
@@ -100,5 +189,25 @@ class EmergencyServiceImpl implements EmergencyService {
     private EmergencyResponse response(EmergencyData emergency) {
         return new EmergencyResponse(emergency.id(), emergency.status(), emergency.previousOperationalStatus(),
                 emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt());
+    }
+
+    /** All lifecycle writers arrive here after locking the root emergency row. */
+    private void transition(EmergencyData emergency, String nextStatus, String previousOperationalStatus,
+            UUID actorUserId, Instant now, boolean updateHeartbeat) {
+        if (nextStatus.equals(emergency.status())) {
+            return;
+        }
+        if (updateHeartbeat) {
+            repository.updateHeartbeat(emergency.id(), nextStatus, previousOperationalStatus, now);
+        } else {
+            repository.updateStatus(emergency.id(), nextStatus, previousOperationalStatus,
+                    "FINALIZED".equals(nextStatus) ? now : null, now);
+        }
+        repository.insertStatusHistory(emergency.id(), repository.nextHistorySequence(emergency.id()), emergency.status(),
+                nextStatus, actorUserId, now);
+    }
+
+    private boolean isOperational(String status) {
+        return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status);
     }
 }
