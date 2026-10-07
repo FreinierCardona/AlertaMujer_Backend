@@ -13,12 +13,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required in .env}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required in .env}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required in .env}
-      FCM_CREDENTIALS_PATH: ${FCM_CREDENTIALS_PATH:?FCM_CREDENTIALS_PATH is required in .env}
+      FCM_CREDENTIALS_PATH: /run/secrets/alertamujer-fcm.json
       EVIDENCE_STORAGE_PATH: ${EVIDENCE_STORAGE_PATH:?EVIDENCE_STORAGE_PATH is required in .env}
     ports:
       - "${BACKEND_HOST_PORT:?BACKEND_HOST_PORT is required in .env}:8080"
     volumes:
       - evidence_data:${EVIDENCE_STORAGE_PATH:?EVIDENCE_STORAGE_PATH is required in .env}
+      - type: bind
+        source: ${FCM_CREDENTIALS_PATH:?FCM_CREDENTIALS_PATH is required in .env}
+        target: /run/secrets/alertamujer-fcm.json
+        read_only: true
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 10s

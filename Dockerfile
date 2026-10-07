@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -DskipTests package
 FROM eclipse-temurin:21-jre-alpine
 
 RUN addgroup -S spring && adduser -S spring -G spring \
-    && mkdir -p /var/lib/alertamujer/evidence \
+    && mkdir -p /var/lib/alertamujer/evidence /run/secrets \
     && chown -R spring:spring /var/lib/alertamujer
 
 WORKDIR /app
