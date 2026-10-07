@@ -1,10 +1,11 @@
 package com.alertamujer;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.alertamujer.backend.shared.config.ApplicationDatasourceGuard;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.core.env.Environment;
 
@@ -12,8 +13,8 @@ class AlertaMujerApplicationTests {
 
     @Test
     void rejectsDatasourceAccountsOtherThanTheApplicationRole() {
-        Environment environment = Mockito.mock(Environment.class);
-        Mockito.when(environment.getRequiredProperty("spring.datasource.username"))
+        Environment environment = mock(Environment.class);
+        when(environment.getRequiredProperty("spring.datasource.username"))
                 .thenReturn("alertamujer_migrator");
 
         ApplicationDatasourceGuard guard = new ApplicationDatasourceGuard(environment);
@@ -25,8 +26,8 @@ class AlertaMujerApplicationTests {
 
     @Test
     void acceptsTheLeastPrivilegeApplicationRole() throws Exception {
-        Environment environment = Mockito.mock(Environment.class);
-        Mockito.when(environment.getRequiredProperty("spring.datasource.username"))
+        Environment environment = mock(Environment.class);
+        when(environment.getRequiredProperty("spring.datasource.username"))
                 .thenReturn("alertamujer_app");
 
         new ApplicationDatasourceGuard(environment).run(new DefaultApplicationArguments(new String[0]));
