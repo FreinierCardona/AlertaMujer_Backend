@@ -25,6 +25,7 @@ public class IdentityOtpRepository {
         this.jdbc = jdbc;
     }
 
+    // Registration context lookup and locking.
     public Optional<RegistrationRequestData> lockRegistrationRequest(UUID requestId) {
         return single("""
                 select registration_request_id,
@@ -68,6 +69,7 @@ public class IdentityOtpRepository {
                 email);
     }
 
+    // OTP issuance and invalidation for registration or an existing account.
     public Optional<VerificationCodeData> lockLatestRegistrationCode(
             UUID requestId, OtpPurpose purpose, OtpChannel channel, String destination) {
         return lockLatestCode("registration_request_id = ?", requestId, purpose, channel, destination);
@@ -153,6 +155,7 @@ public class IdentityOtpRepository {
                 verificationCodeId);
     }
 
+    // OTP consumption and registration completion.
     public void recordFailedAttempt(UUID verificationCodeId, Instant now) {
         jdbc.update("""
                 update identity.user_verification_codes
@@ -284,6 +287,7 @@ public class IdentityOtpRepository {
                 Timestamp.from(now));
     }
 
+    // Scheduled cleanup; each statement selects a bounded, locked batch first.
     public int deleteInvalidVerificationCodes(Instant now, int limit) {
         return jdbc.update("""
                 with candidates as (
