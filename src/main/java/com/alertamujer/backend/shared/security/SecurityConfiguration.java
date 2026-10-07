@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -25,6 +26,7 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             RequestIdFilter requestIdFilter,
+            AccessTokenAuthenticationFilter accessTokenAuthenticationFilter,
             SecurityErrorResponseWriter errorResponseWriter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -37,8 +39,11 @@ public class SecurityConfiguration {
                                 "/api/v1/registration-requests/*/verification-codes").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/registration-requests/*/verification-codes/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/password-reset/verification-codes").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/confirm").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/users").hasRole("ENTITY_ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
@@ -49,6 +54,7 @@ public class SecurityConfiguration {
                                 errorResponseWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN,
                                         "FORBIDDEN", "Access is denied.")))
                 .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(accessTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
