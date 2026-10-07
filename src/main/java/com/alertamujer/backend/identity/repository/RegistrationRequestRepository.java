@@ -10,11 +10,23 @@ import org.springframework.data.repository.query.Param;
 public interface RegistrationRequestRepository extends JpaRepository<RegistrationRequestEntity, UUID> {
 
     @Query(value = """
-            select exists (select 1 from identity.users
-                           where username = :username or email = :email or phone = :phone)
-                or exists (select 1 from identity.registration_requests
-                           where status = 'PENDING'
-                             and (username = :username or email = :email or phone = :phone))
+            select exists (
+                       select 1
+                         from identity.users
+                        where username = :username
+                           or email = :email
+                           or phone = :phone
+                   )
+                or exists (
+                       select 1
+                         from identity.registration_requests
+                        where status = 'PENDING'
+                          and (
+                              username = :username
+                              or email = :email
+                              or phone = :phone
+                          )
+                   )
             """, nativeQuery = true)
     boolean existsIdentityConflict(@Param("username") String username,
             @Param("email") String email, @Param("phone") String phone);
