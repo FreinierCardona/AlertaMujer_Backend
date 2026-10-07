@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import com.alertamujer.backend.identity.dto.request.LoginInput;
 import com.alertamujer.backend.identity.dto.request.PasswordChangeInput;
@@ -29,7 +30,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class AuthenticationServiceImplTest {
@@ -43,9 +43,9 @@ class AuthenticationServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        repository = Mockito.mock(IdentityAuthenticationRepository.class);
-        passwordEncoder = Mockito.mock(PasswordEncoder.class);
-        jwt = Mockito.mock(JwtAccessTokenService.class);
+        repository = mock(IdentityAuthenticationRepository.class);
+        passwordEncoder = mock(PasswordEncoder.class);
+        jwt = mock(JwtAccessTokenService.class);
         service = new AuthenticationServiceImpl(repository, passwordEncoder, jwt, Clock.fixed(now, ZoneOffset.UTC));
         user = new UserAccount(UUID.randomUUID(), "@ana", "Ana", "Perez", "ana@example.com", "3000000000",
                 "USER", "ENABLED", AccountOrigin.SELF_REGISTERED, now.minusSeconds(1));

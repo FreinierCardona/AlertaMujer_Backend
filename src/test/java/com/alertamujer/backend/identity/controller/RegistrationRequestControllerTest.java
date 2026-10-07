@@ -3,6 +3,8 @@ package com.alertamujer.backend.identity.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,7 +16,6 @@ import com.alertamujer.backend.shared.observability.RequestIdFilter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -26,7 +27,7 @@ class RegistrationRequestControllerTest {
 
     @BeforeEach
     void setUp() {
-        service = Mockito.mock(RegistrationRequestService.class);
+        service = mock(RegistrationRequestService.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new RegistrationRequestController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter())
@@ -66,6 +67,6 @@ class RegistrationRequestControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
-        verify(service, org.mockito.Mockito.never()).startPublicRegistration(any());
+        verify(service, never()).startPublicRegistration(any());
     }
 }

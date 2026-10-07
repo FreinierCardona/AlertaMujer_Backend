@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import com.alertamujer.backend.identity.dto.request.ContactChangeVerifyInput;
 import com.alertamujer.backend.evidence.storage.EvidenceFileCleanup;
@@ -28,7 +29,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class ProfileServiceImplTest {
@@ -41,15 +41,15 @@ class ProfileServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        repository = Mockito.mock(ProfileRepository.class);
-        passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        repository = mock(ProfileRepository.class);
+        passwordEncoder = mock(PasswordEncoder.class);
         user = new UserProfileData(UUID.randomUUID(), "@ana", "Ana", "Perez", "ana@example.com", "3000000000",
                 "USER", "ENABLED", AccountOrigin.SELF_REGISTERED, now.minusSeconds(1));
         identity = new AuthenticatedIdentity(user.id(), UUID.randomUUID(), "USER", false);
         SystemConfigurationValues config = new SystemConfigurationValues("Necesito ayuda", (short) 60, (short) 120,
                 (short) 10, 1_048_576, (short) 500, (short) 5, (short) 5, (short) 3, (short) 300);
-        service = new ProfileServiceImpl(repository, passwordEncoder, Mockito.mock(OtpEmailSender.class), config,
-                Mockito.mock(EvidenceFileCleanup.class), Clock.fixed(now, ZoneOffset.UTC));
+        service = new ProfileServiceImpl(repository, passwordEncoder, mock(OtpEmailSender.class), config,
+                mock(EvidenceFileCleanup.class), Clock.fixed(now, ZoneOffset.UTC));
     }
 
     @Test

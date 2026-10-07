@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import com.alertamujer.backend.identity.dto.response.OtpIssuedResponse;
 import com.alertamujer.backend.identity.dto.response.RegistrationVerificationResponse;
@@ -30,7 +31,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class OtpServiceImplTest {
@@ -45,8 +45,8 @@ class OtpServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        repository = Mockito.mock(IdentityOtpRepository.class);
-        emailSender = Mockito.mock(OtpEmailSender.class);
+        repository = mock(IdentityOtpRepository.class);
+        emailSender = mock(OtpEmailSender.class);
         passwordEncoder = new BCryptPasswordEncoder(4);
         SystemConfigurationValues configuration = new SystemConfigurationValues(
                 "I need help", (short) 30, (short) 60, (short) 10, 1_000_000,

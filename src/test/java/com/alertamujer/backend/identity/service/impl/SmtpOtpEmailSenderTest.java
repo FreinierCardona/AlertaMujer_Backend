@@ -2,11 +2,11 @@ package com.alertamujer.backend.identity.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
@@ -14,7 +14,7 @@ class SmtpOtpEmailSenderTest {
 
     @Test
     void buildsThePersonalizedAlertamujerEmailWithoutExposingItThroughAnApiResponse() {
-        JavaMailSender mailSender = Mockito.mock(JavaMailSender.class);
+        JavaMailSender mailSender = mock(JavaMailSender.class);
         SmtpOtpEmailSender sender = new SmtpOtpEmailSender(mailSender, "no-reply@alertamujer.example");
 
         sender.sendVerificationCode("cardonafreinier@gmail.com", "123456", Instant.parse("2026-10-06T21:00:00Z"));
