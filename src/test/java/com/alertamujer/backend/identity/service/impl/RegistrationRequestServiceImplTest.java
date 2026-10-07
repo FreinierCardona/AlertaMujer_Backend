@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import com.alertamujer.backend.identity.dto.request.AdminRegistrationRequestInput;
 import com.alertamujer.backend.identity.dto.request.RegistrationRequestInput;
@@ -22,7 +23,6 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -34,7 +34,7 @@ class RegistrationRequestServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        repository = Mockito.mock(RegistrationRequestRepository.class);
+        repository = mock(RegistrationRequestRepository.class);
         passwordEncoder = new BCryptPasswordEncoder(4);
         SystemConfigurationValues configuration = new SystemConfigurationValues(
                 "I need help", (short) 30, (short) 60, (short) 10, 1_000_000,

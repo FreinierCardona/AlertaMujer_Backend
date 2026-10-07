@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,7 +20,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -30,7 +31,7 @@ class OtpControllerTest {
 
     @BeforeEach
     void setUp() {
-        service = Mockito.mock(OtpService.class);
+        service = mock(OtpService.class);
         mockMvc = MockMvcBuilders.standaloneSetup(new OtpController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter())
@@ -63,7 +64,7 @@ class OtpControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"missing@example.com\"}"))
                 .andExpect(status().isAccepted());
         verify(service).requestPasswordResetCode("missing@example.com");
-        verify(service, org.mockito.Mockito.never()).verifyRegistrationCode(any(), any(), any());
+        verify(service, never()).verifyRegistrationCode(any(), any(), any());
     }
 
     @Test

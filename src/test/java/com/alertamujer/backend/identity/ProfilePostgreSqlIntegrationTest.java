@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -26,13 +25,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 /** Uses the migrated application role to verify the HU-API-010 SQL/grants contract. */
 class ProfilePostgreSqlIntegrationTest {
     @Test
-    void updatesOnlyOwnStateConsumesContactOtpAcceptsTermsAndDeletesTheRoot(@TempDir Path evidenceDirectory) throws Exception {
+    void updatesOnlyOwnStateConsumesContactOtpAcceptsTermsAndDeletesTheRoot() throws Exception {
         String url = System.getenv("SPRING_DATASOURCE_URL");
         String username = System.getenv("SPRING_DATASOURCE_USERNAME");
         String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
         Assumptions.assumeTrue(url != null && username != null && password != null,
                 "Integration database credentials were not supplied");
 
+        Path evidenceDirectory = Files.createTempDirectory(Path.of("target"), "profile-evidence-");
         SpringApplication application = new SpringApplication(AlertaMujerApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of("spring.profiles.active", "test", "spring.datasource.url", url,
@@ -102,6 +102,8 @@ class ProfilePostgreSqlIntegrationTest {
             } finally {
                 jdbc.update("delete from identity.users where user_id in (?, ?)", userId, adminId);
             }
+        } finally {
+            Files.deleteIfExists(evidenceDirectory);
         }
     }
 
