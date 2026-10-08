@@ -11,6 +11,7 @@ import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -25,16 +26,20 @@ class ChatServiceImpl implements ChatService {
     private final ChatRepository repository;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
+    private final SystemConfigurationValues configuration;
 
     @Autowired
-    ChatServiceImpl(ChatRepository repository, ApplicationEventPublisher eventPublisher) {
-        this(repository, Clock.systemUTC(), eventPublisher);
+    ChatServiceImpl(ChatRepository repository, ApplicationEventPublisher eventPublisher,
+            SystemConfigurationValues configuration) {
+        this(repository, Clock.systemUTC(), eventPublisher, configuration);
     }
 
-    ChatServiceImpl(ChatRepository repository, Clock clock, ApplicationEventPublisher eventPublisher) {
+    ChatServiceImpl(ChatRepository repository, Clock clock, ApplicationEventPublisher eventPublisher,
+            SystemConfigurationValues configuration) {
         this.repository = repository;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
+        this.configuration = configuration;
     }
 
     @Override
@@ -85,7 +90,7 @@ class ChatServiceImpl implements ChatService {
     private String normalize(String content) {
         if (content == null) throw new RuleViolationException();
         String normalized = content.trim();
-        if (normalized.isBlank() || normalized.length() > 500) throw new RuleViolationException();
+        if (normalized.isBlank() || normalized.length() > configuration.maxChatMessageLength()) throw new RuleViolationException();
         return normalized;
     }
 
