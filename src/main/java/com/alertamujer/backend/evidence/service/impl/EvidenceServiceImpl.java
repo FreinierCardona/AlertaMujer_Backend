@@ -11,6 +11,7 @@ import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.time.Clock;
@@ -27,15 +28,16 @@ import org.springframework.web.multipart.MultipartFile;
 class EvidenceServiceImpl implements EvidenceService {
     private final EvidenceRepository repository;
     private final EvidenceStorage storage;
+    private final SystemConfigurationValues configuration;
     private final Clock clock;
 
     @Autowired
-    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage) {
-        this(repository, storage, Clock.systemUTC());
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration) {
+        this(repository, storage, configuration, Clock.systemUTC());
     }
 
-    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, Clock clock) {
-        this.repository = repository; this.storage = storage; this.clock = clock;
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration, Clock clock) {
+        this.repository = repository; this.storage = storage; this.configuration = configuration; this.clock = clock;
     }
 
     @Override
@@ -46,7 +48,7 @@ class EvidenceServiceImpl implements EvidenceService {
                 .orElseThrow(ResourceNotFoundException::new);
         if (!isOperational(emergency.status())) throw new StateConflictException();
         int sequence = repository.nextSequence(emergencyId);
-        if (sequence > 10) throw new RuleViolationException();
+        if (sequence > configuration.maxEvidenceCount()) throw new RuleViolationException();
 
         StoredEvidenceFile stored = null;
         try {
