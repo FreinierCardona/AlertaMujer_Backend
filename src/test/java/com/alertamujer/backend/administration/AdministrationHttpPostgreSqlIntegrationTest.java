@@ -11,6 +11,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -30,7 +33,7 @@ class AdministrationHttpPostgreSqlIntegrationTest {
     private static final String PASSWORD = "SecurePass#2026";
 
     @Test
-    void operatesEveryAdministrativeRouteWithRealPostgreSqlGrantsAndAudits() throws Exception {
+    void operatesEveryAdministrativeRouteWithRealPostgreSqlGrantsAndAudits(@TempDir Path evidenceDirectory) throws Exception {
         String url = System.getenv("SPRING_DATASOURCE_URL");
         String username = System.getenv("SPRING_DATASOURCE_USERNAME");
         String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
@@ -41,7 +44,8 @@ class AdministrationHttpPostgreSqlIntegrationTest {
         application.setWebApplicationType(WebApplicationType.SERVLET);
         application.setDefaultProperties(Map.of("spring.profiles.active", "test", "spring.datasource.url", url,
                 "spring.datasource.username", username, "spring.datasource.password", password, "server.port", 0,
-                "management.health.mail.enabled", false, "spring.main.banner-mode", "off"));
+                "management.health.mail.enabled", false, "spring.main.banner-mode", "off",
+                "evidence.storage-path", evidenceDirectory.toString()));
         try (ConfigurableApplicationContext context = application.run()) {
             JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
             Assumptions.assumeTrue(jdbc.queryForObject("select count(*) from identity.users where role = 'ENTITY_ADMIN'",
@@ -72,6 +76,18 @@ class AdministrationHttpPostgreSqlIntegrationTest {
                 UUID emergencyId = emergencyService.createOrRecover(identity(owner), new EmergencyCreateInput(
                         new BigDecimal("4.609710"), new BigDecimal("-74.081750"), new BigDecimal("8.5"),
                         now.minusSeconds(2), null)).emergency().emergencyId();
+                UUID evidenceId = UUID.randomUUID();
+                String evidenceReference = evidenceId + ".webp";
+                Files.write(evidenceDirectory.resolve(evidenceReference), new byte[] {0x52, 0x49, 0x46});
+                jdbc.update("""
+                        insert into emergency.emergency_evidences (evidence_id, emergency_id, evidence_sequence, file_reference,
+                            original_file_name, mime_type, original_mime_type, file_size_bytes, received_at)
+                        values (?, ?, 1, ?, 'administrative-fixture.webp', 'image/webp', 'image/webp', 3, ?)
+                        """, evidenceId, emergencyId, evidenceReference, Timestamp.from(now));
+                jdbc.update("""
+                        insert into emergency.emergency_chat_messages (client_message_id, emergency_id, sender_user_id, content, sent_at)
+                        values (?, ?, ?, 'Administrative audit fixture', ?)
+                        """, UUID.randomUUID(), emergencyId, owner, Timestamp.from(now));
 
                 String adminToken = login(client, json, baseUrl, "admin-1-" + suffix + "@example.com");
                 String userToken = login(client, json, baseUrl, "admin-2-" + suffix + "@example.com");
@@ -80,6 +96,9 @@ class AdministrationHttpPostgreSqlIntegrationTest {
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/dashboard", adminToken, null), 200);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/emergencies?status=ACTIVE", adminToken, null), 200);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/emergencies/" + emergencyId, adminToken, null), 200);
+                assertStatus(call(client, "GET", baseUrl + "/api/v1/emergencies/" + emergencyId + "/evidences", adminToken, null), 200);
+                assertStatus(call(client, "GET", baseUrl + "/api/v1/evidences/" + evidenceId + "/content", adminToken, null), 200);
+                assertStatus(call(client, "GET", baseUrl + "/api/v1/emergencies/" + emergencyId + "/messages?after=0&size=20", adminToken, null), 200);
                 assertStatus(call(client, "POST", baseUrl + "/api/v1/admin/emergencies/" + emergencyId + "/attention", adminToken, null), 204);
                 assertStatus(call(client, "POST", baseUrl + "/api/v1/admin/emergencies/" + emergencyId + "/attention", adminToken, null), 204);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/users", adminToken, null), 200);
@@ -97,7 +116,7 @@ class AdministrationHttpPostgreSqlIntegrationTest {
                 assertThat(jdbc.queryForObject("select count(*) from audit.audit_logs where actor_user_id = ? and action = 'ADMIN_LOGIN'",
                         Integer.class, administrator)).isEqualTo(1);
                 assertThat(jdbc.queryForObject("select count(*) from audit.audit_logs where actor_user_id = ? and action = 'ALERT_VIEWED'",
-                        Integer.class, administrator)).isEqualTo(3);
+                        Integer.class, administrator)).isEqualTo(6);
                 assertThat(jdbc.queryForObject("select count(*) from audit.audit_logs where actor_user_id = ? and action = 'ALERT_STATUS_CHANGED'",
                         Integer.class, administrator)).isEqualTo(1);
                 assertThat(jdbc.queryForObject("select count(*) from audit.audit_logs where actor_user_id = ? and action = 'USER_PROFILE_VIEWED'",

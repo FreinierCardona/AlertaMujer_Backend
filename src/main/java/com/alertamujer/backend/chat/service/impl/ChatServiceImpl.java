@@ -12,6 +12,8 @@ import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -27,28 +29,35 @@ class ChatServiceImpl implements ChatService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
     private final SystemConfigurationValues configuration;
+    private final AuditService auditService;
 
     @Autowired
     ChatServiceImpl(ChatRepository repository, ApplicationEventPublisher eventPublisher,
-            SystemConfigurationValues configuration) {
-        this(repository, Clock.systemUTC(), eventPublisher, configuration);
+            SystemConfigurationValues configuration, AuditService auditService) {
+        this(repository, Clock.systemUTC(), eventPublisher, configuration, auditService);
     }
 
     ChatServiceImpl(ChatRepository repository, Clock clock, ApplicationEventPublisher eventPublisher,
-            SystemConfigurationValues configuration) {
+            SystemConfigurationValues configuration, AuditService auditService) {
         this.repository = repository;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
+        this.auditService = auditService;
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChatMessageResponse> list(AuthenticatedIdentity identity, UUID emergencyId, long after, int size) {
         requireReader(identity);
         if (after < 0 || size < 1 || size > 50) throw new RuleViolationException();
         authorize(identity, emergencyId, false);
-        return repository.findAfter(emergencyId, after, size).stream().map(this::response).toList();
+        List<ChatMessageResponse> messages = repository.findAfter(emergencyId, after, size).stream().map(this::response).toList();
+        if ("ENTITY_ADMIN".equals(identity.role())) {
+            auditService.record(AuditEvent.success(identity.userId(), null, "ALERT_VIEWED", "EMERGENCY", emergencyId,
+                    null, null, "Administrative emergency messages viewed."));
+        }
+        return messages;
     }
 
     @Override
