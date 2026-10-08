@@ -7,8 +7,8 @@ import com.alertamujer.backend.contacts.dto.response.DirectoryUserResponse;
 import com.alertamujer.backend.contacts.dto.response.PageResponse;
 import com.alertamujer.backend.contacts.service.ContactService;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.validation.PageParameters;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -38,9 +38,8 @@ public class ContactController {
     @GetMapping("/directory")
     public PageResponse<DirectoryUserResponse> directory(@AuthenticationPrincipal AuthenticatedIdentity identity,
             @RequestParam(required = false) @Size(min = 1, max = 50) String query,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) int size) {
-        return contactService.directory(identity, query, page, size);
+            @Valid PageParameters parameters) {
+        return contactService.directory(identity, query, parameters.getPage(), parameters.getSize());
     }
 
     @PostMapping("/contact-invitations")
@@ -70,8 +69,7 @@ public class ContactController {
 
     @GetMapping("/contacts")
     public PageResponse<ContactResponse> ownContacts(@AuthenticationPrincipal AuthenticatedIdentity identity,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) int size) {
-        return contactService.ownContacts(identity, page, size);
+            @Valid PageParameters parameters) {
+        return contactService.ownContacts(identity, parameters.getPage(), parameters.getSize());
     }
 }
