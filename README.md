@@ -232,11 +232,9 @@ La ruta `EVIDENCE_STORAGE_PATH` se monta sobre un volumen nombrado persistente.
 No se expone como directorio HTTP: las evidencias se sirven únicamente por los
 endpoints autorizados del módulo `evidence`.
 
-> **SMTP en Docker:** el `docker-compose.yml` actual no inyecta variables
-> `SMTP_*` al contenedor. Para validar OTP por correo se puede usar la
-> ejecución local anterior; un despliegue en contenedor debe proporcionar esas
-> variables explícitamente al proceso. La presencia de `SMTP_*` en `.env` no
-> las entrega automáticamente a la aplicación dentro del contenedor.
+> **SMTP en Docker:** `docker-compose.yml` entrega las variables `SMTP_*` de
+> `.env` al contenedor. Configure una cuenta SMTP real y un remitente verificado
+> antes de probar la entrega de OTP por correo.
 
 ### Base de Datos en Docker
 
