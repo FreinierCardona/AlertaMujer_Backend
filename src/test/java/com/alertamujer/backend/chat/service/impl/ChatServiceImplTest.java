@@ -15,6 +15,7 @@ import com.alertamujer.backend.chat.repository.ChatRepository;
 import com.alertamujer.backend.chat.repository.ChatRepository.ChatMessageData;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,7 +38,7 @@ class ChatServiceImplTest {
     void setUp() {
         repository = mock(ChatRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events);
+        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events, configuration((short) 500));
         emergencyId = UUID.randomUUID();
         owner = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
     }
@@ -82,5 +83,21 @@ class ChatServiceImplTest {
         assertThatThrownBy(() -> service.send(owner, emergencyId, new ChatMessageInput(UUID.randomUUID(), "   ")))
                 .isInstanceOf(RuleViolationException.class);
         verify(repository, never()).insert(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void rejectsMessagesLongerThanTheConfiguredLimitBeforeLookingUpTheEmergency() {
+        ChatServiceImpl restricted = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events,
+                configuration((short) 5));
+
+        assertThatThrownBy(() -> restricted.send(owner, emergencyId, new ChatMessageInput(UUID.randomUUID(), "123456")))
+                .isInstanceOf(RuleViolationException.class);
+
+        verify(repository, never()).findAuthorizedEmergency(any(), any(), any(), any(Boolean.class));
+    }
+
+    private SystemConfigurationValues configuration(short maxChatMessageLength) {
+        return new SystemConfigurationValues("Necesito ayuda", (short) 60, (short) 120, (short) 10,
+                1_048_576, maxChatMessageLength, (short) 180, (short) 5, (short) 3, (short) 300);
     }
 }
