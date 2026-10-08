@@ -1,5 +1,6 @@
 package com.alertamujer.backend.evidence.storage;
 
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -24,6 +25,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,15 +33,21 @@ import org.springframework.web.multipart.MultipartFile;
 /** Converts supported camera image uploads to bounded WebP files below the private configured directory. */
 @Component
 class LocalEvidenceStorage implements EvidenceStorage {
-    static final int MAX_FINAL_BYTES = 1_048_576;
     static final long MAX_INPUT_BYTES = 10L * 1_024 * 1_024;
     private static final long MAX_PIXELS = 24_000_000L;
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalEvidenceStorage.class);
     private static final Set<String> ACCEPTED_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private final String storagePath;
+    private final int maxFinalBytes;
 
-    LocalEvidenceStorage(@Value("${evidence.storage-path:}") String storagePath) {
+    @Autowired
+    LocalEvidenceStorage(@Value("${evidence.storage-path:}") String storagePath, SystemConfigurationValues configuration) {
+        this(storagePath, configuration.maxEvidenceSizeBytes());
+    }
+
+    LocalEvidenceStorage(String storagePath, int maxFinalBytes) {
         this.storagePath = storagePath;
+        this.maxFinalBytes = maxFinalBytes;
     }
 
     @Override
@@ -135,7 +143,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
             BufferedImage image = scale == 1.0 ? original : resized(original, scale);
             for (float quality : new float[] {0.90f, 0.80f, 0.70f, 0.60f, 0.50f, 0.40f, 0.30f, 0.20f, 0.10f}) {
                 byte[] encoded = writeWebp(image, quality);
-                if (encoded.length <= MAX_FINAL_BYTES) return encoded;
+                if (encoded.length <= maxFinalBytes) return encoded;
             }
         }
         throw new RuleViolationException();

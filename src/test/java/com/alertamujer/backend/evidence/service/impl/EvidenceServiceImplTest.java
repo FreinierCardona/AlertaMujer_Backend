@@ -15,6 +15,7 @@ import com.alertamujer.backend.evidence.storage.StoredEvidenceFile;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,7 +37,8 @@ class EvidenceServiceImplTest {
     void setUp() {
         repository = mock(EvidenceRepository.class);
         storage = mock(EvidenceStorage.class);
-        service = new EvidenceServiceImpl(repository, storage, Clock.fixed(Instant.parse("2026-10-07T18:00:00Z"), ZoneOffset.UTC));
+        service = new EvidenceServiceImpl(repository, storage, configuration((short) 2),
+                Clock.fixed(Instant.parse("2026-10-07T18:00:00Z"), ZoneOffset.UTC));
         emergencyId = UUID.randomUUID();
         identity = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
     }
@@ -59,10 +61,10 @@ class EvidenceServiceImplTest {
     }
 
     @Test
-    void refusesAnEleventhConfirmedEvidenceBeforeWritingTheFile() throws Exception {
+    void refusesEvidenceBeyondTheConfiguredCountBeforeWritingTheFile() throws Exception {
         when(repository.lockOwnedEnabledEmergency(emergencyId, identity.userId()))
                 .thenReturn(Optional.of(new EvidenceRepository.EmergencyData(emergencyId, "ACTIVE")));
-        when(repository.nextSequence(emergencyId)).thenReturn(11);
+        when(repository.nextSequence(emergencyId)).thenReturn(3);
 
         assertThatThrownBy(() -> service.upload(identity, emergencyId, file())).isInstanceOf(RuleViolationException.class);
         verify(storage, never()).store(any());
@@ -83,5 +85,10 @@ class EvidenceServiceImplTest {
 
     private MockMultipartFile file() {
         return new MockMultipartFile("file", "camera.jpg", "image/jpeg", new byte[] {1, 2, 3});
+    }
+
+    private SystemConfigurationValues configuration(short maxEvidenceCount) {
+        return new SystemConfigurationValues("Necesito ayuda", (short) 60, (short) 120, maxEvidenceCount,
+                1_048_576, (short) 500, (short) 180, (short) 5, (short) 3, (short) 300);
     }
 }

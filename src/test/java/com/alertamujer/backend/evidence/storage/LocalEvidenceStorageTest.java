@@ -25,7 +25,7 @@ class LocalEvidenceStorageTest {
 
     @Test
     void convertsAnAcceptedImageToBoundedWebpWithoutExposingItsPath() throws Exception {
-        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString());
+        LocalEvidenceStorage storage = storage();
         StoredEvidenceFile stored = storage.store(cameraImage());
 
         assertThat(stored.reference()).matches("[0-9a-f-]{36}\\.webp");
@@ -36,7 +36,7 @@ class LocalEvidenceStorageTest {
 
     @Test
     void rejectsArbitraryFilesBeforeCreatingAFile() {
-        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString());
+        LocalEvidenceStorage storage = storage();
         MockMultipartFile file = new MockMultipartFile("file", "note.txt", "text/plain", "not a photograph".getBytes());
 
         assertThatThrownBy(() -> storage.store(file)).isInstanceOf(RuleViolationException.class);
@@ -45,7 +45,7 @@ class LocalEvidenceStorageTest {
 
     @Test
     void rejectsADeclaredPhotoThatCannotBeConverted() {
-        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString());
+        LocalEvidenceStorage storage = storage();
         MockMultipartFile file = new MockMultipartFile("file", "camera.jpg", "image/jpeg", "not an image".getBytes());
 
         assertThatThrownBy(() -> storage.store(file)).isInstanceOf(RuleViolationException.class);
@@ -54,7 +54,7 @@ class LocalEvidenceStorageTest {
 
     @Test
     void rejectsInputOverTheConfiguredTransportLimit() {
-        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString());
+        LocalEvidenceStorage storage = storage();
         MockMultipartFile file = new MockMultipartFile("file", "camera.png", "image/png",
                 new byte[(int) LocalEvidenceStorage.MAX_INPUT_BYTES + 1]);
 
@@ -64,7 +64,7 @@ class LocalEvidenceStorageTest {
 
     @Test
     void reconcilesOnlyOldUnreferencedWebpFiles() throws Exception {
-        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString());
+        LocalEvidenceStorage storage = storage();
         Files.write(directory.resolve("11111111-1111-1111-1111-111111111111.webp"), new byte[] {1});
         Files.write(directory.resolve("22222222-2222-2222-2222-222222222222.webp"), new byte[] {1});
         Files.setLastModifiedTime(directory.resolve("11111111-1111-1111-1111-111111111111.webp"),
@@ -83,5 +83,17 @@ class LocalEvidenceStorageTest {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         ImageIO.write(image, "png", bytes);
         return new MockMultipartFile("file", "camera.png", "image/png", bytes.toByteArray());
+    }
+
+    @Test
+    void rejectsAWebpLargerThanTheConfiguredEvidenceLimit() throws Exception {
+        LocalEvidenceStorage storage = new LocalEvidenceStorage(directory.toString(), 1);
+
+        assertThatThrownBy(() -> storage.store(cameraImage())).isInstanceOf(RuleViolationException.class);
+        assertThat(directory).isEmptyDirectory();
+    }
+
+    private LocalEvidenceStorage storage() {
+        return new LocalEvidenceStorage(directory.toString(), 1_048_576);
     }
 }
