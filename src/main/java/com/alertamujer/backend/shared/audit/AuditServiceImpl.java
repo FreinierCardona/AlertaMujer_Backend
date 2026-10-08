@@ -40,7 +40,8 @@ class AuditServiceImpl implements AuditService {
     }
 
     private void validate(AuditEvent event) {
-        if (event == null || event.actorUserId() == null || event.entityId() == null
+        if (event == null || event.entityId() == null
+                || (event.actorUserId() == null && !"ACCOUNT_STATUS_CHANGED".equals(event.action()))
                 || !isAction(event.action()) || !"SUCCESS".equals(event.result())
                 || event.entityType() == null || event.entityType().isBlank()
                 || event.description() == null || event.description().isBlank()

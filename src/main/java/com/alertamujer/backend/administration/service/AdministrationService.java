@@ -29,6 +29,9 @@ public interface AdministrationService {
     void deleteUser(AuthenticatedIdentity identity, UUID userId);
 
     PageResponse<AuditLogResponse> auditLogs(AuthenticatedIdentity identity, int page, int size);
-    
+
+    /** Internal scheduler operation; it is deliberately not exposed through HTTP. */
+    boolean disableUserIfStillInactive(UUID userId);
+
     void replaceAdministrator(UUID targetUserId);
 }
