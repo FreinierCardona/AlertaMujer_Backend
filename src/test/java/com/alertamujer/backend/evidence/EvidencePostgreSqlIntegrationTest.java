@@ -8,12 +8,15 @@ import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -70,6 +73,8 @@ class EvidencePostgreSqlIntegrationTest {
             } finally {
                 jdbc.update("delete from identity.users where user_id = ?", owner);
             }
+        } finally {
+            deleteDirectory(storage);
         }
     }
 
@@ -79,5 +84,12 @@ class EvidencePostgreSqlIntegrationTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
         return new MockMultipartFile("file", "camera.png", "image/png", output.toByteArray());
+    }
+
+    private static void deleteDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) return;
+        try (Stream<Path> paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        }
     }
 }
