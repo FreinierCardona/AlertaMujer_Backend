@@ -15,6 +15,10 @@ import com.alertamujer.backend.evidence.storage.StoredEvidenceFile;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.audit.AuditService;
+import java.io.ByteArrayInputStream;
+import java.util.List;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Clock;
 import java.time.Instant;
@@ -28,6 +32,7 @@ import org.springframework.mock.web.MockMultipartFile;
 class EvidenceServiceImplTest {
     private EvidenceRepository repository;
     private EvidenceStorage storage;
+    private AuditService audit;
     private EvidenceServiceImpl service;
     private UUID emergencyId;
     private AuthenticatedIdentity identity;
@@ -36,7 +41,9 @@ class EvidenceServiceImplTest {
     void setUp() {
         repository = mock(EvidenceRepository.class);
         storage = mock(EvidenceStorage.class);
-        service = new EvidenceServiceImpl(repository, storage, Clock.fixed(Instant.parse("2026-10-07T18:00:00Z"), ZoneOffset.UTC));
+        audit = mock(AuditService.class);
+        service = new EvidenceServiceImpl(repository, storage, configuration((short) 2), audit,
+                Clock.fixed(Instant.parse("2026-10-07T18:00:00Z"), ZoneOffset.UTC));
         emergencyId = UUID.randomUUID();
         identity = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
     }
@@ -59,10 +66,10 @@ class EvidenceServiceImplTest {
     }
 
     @Test
-    void refusesAnEleventhConfirmedEvidenceBeforeWritingTheFile() throws Exception {
+    void refusesEvidenceBeyondTheConfiguredCountBeforeWritingTheFile() throws Exception {
         when(repository.lockOwnedEnabledEmergency(emergencyId, identity.userId()))
                 .thenReturn(Optional.of(new EvidenceRepository.EmergencyData(emergencyId, "ACTIVE")));
-        when(repository.nextSequence(emergencyId)).thenReturn(11);
+        when(repository.nextSequence(emergencyId)).thenReturn(3);
 
         assertThatThrownBy(() -> service.upload(identity, emergencyId, file())).isInstanceOf(RuleViolationException.class);
         verify(storage, never()).store(any());
@@ -81,7 +88,30 @@ class EvidenceServiceImplTest {
         verify(storage).deleteAfterPersistenceFailure("00000000-0000-0000-0000-000000000001.webp");
     }
 
+    @Test
+    void auditsSuccessfulAdministrativeEvidenceReads() throws Exception {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+        EvidenceRepository.EvidenceData stored = new EvidenceRepository.EvidenceData(UUID.randomUUID(), emergencyId,
+                "00000000-0000-0000-0000-000000000001.webp", "image/webp", 42, Instant.now());
+        when(repository.hasAuthorizedEmergency(emergencyId, administrator.userId(), "ENTITY_ADMIN")).thenReturn(true);
+        when(repository.findAuthorizedEmergencyEvidence(emergencyId, administrator.userId(), "ENTITY_ADMIN")).thenReturn(List.of(stored));
+        when(repository.findAuthorizedEvidence(stored.id(), administrator.userId(), "ENTITY_ADMIN")).thenReturn(Optional.of(stored));
+        when(storage.open(stored.reference())).thenReturn(new ByteArrayInputStream(new byte[] {1}));
+
+        service.list(administrator, emergencyId);
+        service.content(administrator, stored.id());
+
+        verify(audit, org.mockito.Mockito.times(2)).record(org.mockito.ArgumentMatchers.argThat(event ->
+                "ALERT_VIEWED".equals(event.action()) && emergencyId.equals(event.entityId())
+                        && administrator.userId().equals(event.actorUserId())));
+    }
+
     private MockMultipartFile file() {
         return new MockMultipartFile("file", "camera.jpg", "image/jpeg", new byte[] {1, 2, 3});
+    }
+
+    private SystemConfigurationValues configuration(short maxEvidenceCount) {
+        return new SystemConfigurationValues("Necesito ayuda", (short) 60, (short) 120, maxEvidenceCount,
+                1_048_576, (short) 500, (short) 180, (short) 5, (short) 3, (short) 300);
     }
 }

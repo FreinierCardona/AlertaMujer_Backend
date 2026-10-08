@@ -2,8 +2,10 @@ package com.alertamujer.backend.contacts.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +64,20 @@ class ContactControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"ana\",\"status\":\"ACCEPTED\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void rejectsOversizedDirectoryAndContactPagesBeforeTheService() throws Exception {
+        mockMvc.perform(get("/api/v1/directory").param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mockMvc.perform(get("/api/v1/contacts").param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        verify(service, never()).directory(any(), any(), any(Integer.class), any(Integer.class));
+        verify(service, never()).ownContacts(any(), any(Integer.class), any(Integer.class));
     }
 
     private HandlerMethodArgumentResolver identityResolver() {

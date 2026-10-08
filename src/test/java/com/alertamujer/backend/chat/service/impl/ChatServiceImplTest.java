@@ -15,6 +15,9 @@ import com.alertamujer.backend.chat.repository.ChatRepository;
 import com.alertamujer.backend.chat.repository.ChatRepository.ChatMessageData;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.audit.AuditService;
+import java.util.List;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +32,7 @@ class ChatServiceImplTest {
     private final Instant now = Instant.parse("2026-10-07T18:00:00Z");
     private ChatRepository repository;
     private ApplicationEventPublisher events;
+    private AuditService audit;
     private ChatServiceImpl service;
     private UUID emergencyId;
     private AuthenticatedIdentity owner;
@@ -37,7 +41,8 @@ class ChatServiceImplTest {
     void setUp() {
         repository = mock(ChatRepository.class);
         events = mock(ApplicationEventPublisher.class);
-        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events);
+        audit = mock(AuditService.class);
+        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events, configuration((short) 500), audit);
         emergencyId = UUID.randomUUID();
         owner = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
     }
@@ -82,5 +87,34 @@ class ChatServiceImplTest {
         assertThatThrownBy(() -> service.send(owner, emergencyId, new ChatMessageInput(UUID.randomUUID(), "   ")))
                 .isInstanceOf(RuleViolationException.class);
         verify(repository, never()).insert(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void rejectsMessagesLongerThanTheConfiguredLimitBeforeLookingUpTheEmergency() {
+        ChatServiceImpl restricted = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events,
+                configuration((short) 5), audit);
+
+        assertThatThrownBy(() -> restricted.send(owner, emergencyId, new ChatMessageInput(UUID.randomUUID(), "123456")))
+                .isInstanceOf(RuleViolationException.class);
+
+        verify(repository, never()).findAuthorizedEmergency(any(), any(), any(), any(Boolean.class));
+    }
+
+    @Test
+    void auditsSuccessfulAdministrativeMessageReads() {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+        when(repository.findAuthorizedEmergency(emergencyId, administrator.userId(), "ENTITY_ADMIN", false))
+                .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "ACTIVE")));
+        when(repository.findAfter(emergencyId, 0, 20)).thenReturn(List.of());
+
+        service.list(administrator, emergencyId, 0, 20);
+
+        verify(audit).record(org.mockito.ArgumentMatchers.argThat(event -> "ALERT_VIEWED".equals(event.action())
+                && emergencyId.equals(event.entityId()) && administrator.userId().equals(event.actorUserId())));
+    }
+
+    private SystemConfigurationValues configuration(short maxChatMessageLength) {
+        return new SystemConfigurationValues("Necesito ayuda", (short) 60, (short) 120, (short) 10,
+                1_048_576, maxChatMessageLength, (short) 180, (short) 5, (short) 3, (short) 300);
     }
 }

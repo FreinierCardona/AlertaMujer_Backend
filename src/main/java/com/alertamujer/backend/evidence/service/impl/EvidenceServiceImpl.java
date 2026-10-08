@@ -11,6 +11,9 @@ import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.time.Clock;
@@ -27,15 +30,20 @@ import org.springframework.web.multipart.MultipartFile;
 class EvidenceServiceImpl implements EvidenceService {
     private final EvidenceRepository repository;
     private final EvidenceStorage storage;
+    private final SystemConfigurationValues configuration;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Autowired
-    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage) {
-        this(repository, storage, Clock.systemUTC());
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration,
+            AuditService auditService) {
+        this(repository, storage, configuration, auditService, Clock.systemUTC());
     }
 
-    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, Clock clock) {
-        this.repository = repository; this.storage = storage; this.clock = clock;
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration,
+            AuditService auditService, Clock clock) {
+        this.repository = repository; this.storage = storage; this.configuration = configuration;
+        this.auditService = auditService; this.clock = clock;
     }
 
     @Override
@@ -46,7 +54,7 @@ class EvidenceServiceImpl implements EvidenceService {
                 .orElseThrow(ResourceNotFoundException::new);
         if (!isOperational(emergency.status())) throw new StateConflictException();
         int sequence = repository.nextSequence(emergencyId);
-        if (sequence > 10) throw new RuleViolationException();
+        if (sequence > configuration.maxEvidenceCount()) throw new RuleViolationException();
 
         StoredEvidenceFile stored = null;
         try {
@@ -65,24 +73,28 @@ class EvidenceServiceImpl implements EvidenceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<EvidenceResponse> list(AuthenticatedIdentity identity, UUID emergencyId) {
         requireReader(identity);
         if (!repository.hasAuthorizedEmergency(emergencyId, identity.userId(), identity.role())) {
             throw new ResourceNotFoundException();
         }
-        return repository.findAuthorizedEmergencyEvidence(emergencyId, identity.userId(), identity.role()).stream()
+        List<EvidenceResponse> evidence = repository.findAuthorizedEmergencyEvidence(emergencyId, identity.userId(), identity.role()).stream()
                 .map(this::response).toList();
+        auditAdministrativeAlertAccess(identity, emergencyId, "Administrative emergency evidence list viewed.");
+        return evidence;
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public EvidenceContent content(AuthenticatedIdentity identity, UUID evidenceId) {
         requireReader(identity);
         EvidenceData data = repository.findAuthorizedEvidence(evidenceId, identity.userId(), identity.role())
                 .orElseThrow(ResourceNotFoundException::new);
         try {
-            return new EvidenceContent(storage.open(data.reference()), data.sizeBytes());
+            EvidenceContent content = new EvidenceContent(storage.open(data.reference()), data.sizeBytes());
+            auditAdministrativeAlertAccess(identity, data.emergencyId(), "Administrative emergency evidence content viewed.");
+            return content;
         } catch (NoSuchFileException exception) {
             throw new ResourceNotFoundException();
         } catch (IOException exception) {
@@ -110,6 +122,13 @@ class EvidenceServiceImpl implements EvidenceService {
 
     private boolean isOperational(String status) {
         return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status);
+    }
+
+    private void auditAdministrativeAlertAccess(AuthenticatedIdentity identity, UUID emergencyId, String description) {
+        if ("ENTITY_ADMIN".equals(identity.role())) {
+            auditService.record(AuditEvent.success(identity.userId(), null, "ALERT_VIEWED", "EMERGENCY", emergencyId,
+                    null, null, description));
+        }
     }
 
     private String safeOriginalName(MultipartFile file) {
