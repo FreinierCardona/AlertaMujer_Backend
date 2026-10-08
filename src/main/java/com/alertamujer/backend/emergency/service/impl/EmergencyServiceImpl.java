@@ -4,6 +4,7 @@ import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
 import com.alertamujer.backend.emergency.event.EmergencyCreatedEvent;
+import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
 import com.alertamujer.backend.emergency.service.EmergencyService;
@@ -72,6 +73,7 @@ class EmergencyServiceImpl implements EmergencyService {
         repository.insertInitialLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(),
                 input.capturedAt(), now);
         repository.insertInitialHistory(emergencyId, userId, now);
+        eventPublisher.publishEvent(new EmergencyStatusChangedEvent(emergencyId, "ACTIVE", now));
         eventPublisher.publishEvent(new EmergencyCreatedEvent(emergencyId, message, input.latitude(), input.longitude()));
         return new CreationResult(new EmergencyResponse(emergencyId, "ACTIVE", null, now, null, null), true);
     }
@@ -216,6 +218,7 @@ class EmergencyServiceImpl implements EmergencyService {
         }
         repository.insertStatusHistory(emergency.id(), repository.nextHistorySequence(emergency.id()), emergency.status(),
                 nextStatus, actorUserId, now);
+        eventPublisher.publishEvent(new EmergencyStatusChangedEvent(emergency.id(), nextStatus, now));
     }
 
     private boolean isOperational(String status) {
