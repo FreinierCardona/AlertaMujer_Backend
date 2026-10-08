@@ -45,7 +45,7 @@ public class SecurityConfiguration {
                                 "/api/v1/auth/password-reset/verification-codes").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/confirm").permitAll()
                         .requestMatchers("/ws", "/ws/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/users").hasRole("ENTITY_ADMIN")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ENTITY_ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->

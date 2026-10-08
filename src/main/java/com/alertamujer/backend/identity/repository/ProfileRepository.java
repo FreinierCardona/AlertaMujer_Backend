@@ -117,6 +117,15 @@ public class ProfileRepository {
     }
     public void deleteUser(UUID userId) { jdbc.update("delete from identity.users where user_id = ?", userId); }
 
+    public Optional<AdministrativeDeletionCandidate> lockAdministrativeDeletionCandidate(UUID userId) {
+        List<AdministrativeDeletionCandidate> rows = jdbc.query("""
+                select user_id, role, account_status, disabled_at
+                  from identity.users where user_id = ? for update
+                """, (rs, row) -> new AdministrativeDeletionCandidate(rs.getObject(1, UUID.class), rs.getString(2),
+                rs.getString(3), instant(rs.getTimestamp(4))), userId);
+        return rows.stream().findFirst();
+    }
+
     private Optional<UserProfileData> user(UUID userId, boolean lock) {
         List<UserProfileData> rows = jdbc.query("""
                 select user_id, username::text, first_names, last_names, email::text, phone, role, account_status,
@@ -133,4 +142,5 @@ public class ProfileRepository {
             String phone, String role, String accountStatus, AccountOrigin accountOrigin, Instant acceptedTermsAt) { }
     public record VerificationCodeData(UUID id, Instant expiresAt, Instant usedAt, Instant invalidatedAt,
             int attemptCount, int maxAttempts, int resendNumber, Instant createdAt) { }
+    public record AdministrativeDeletionCandidate(UUID id, String role, String accountStatus, Instant disabledAt) { }
 }
