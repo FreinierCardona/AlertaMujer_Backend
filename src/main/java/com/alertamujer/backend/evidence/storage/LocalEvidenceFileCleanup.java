@@ -15,7 +15,7 @@ class LocalEvidenceFileCleanup implements EvidenceFileCleanup {
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalEvidenceFileCleanup.class);
     private final String storagePath;
 
-    LocalEvidenceFileCleanup(@Value("${EVIDENCE_STORAGE_PATH:}") String storagePath) { this.storagePath = storagePath; }
+    LocalEvidenceFileCleanup(@Value("${evidence.storage-path:}") String storagePath) { this.storagePath = storagePath; }
 
     @Override
     public void deleteAfterAccountRemoval(Collection<String> references) {
