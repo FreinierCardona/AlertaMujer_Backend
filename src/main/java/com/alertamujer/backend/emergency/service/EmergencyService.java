@@ -18,7 +18,7 @@ public interface EmergencyService {
     PageResponse<EmergencyResponse> ownHistory(AuthenticatedIdentity identity, int page, int size);
 
     /** Called by the administration module in HU-API-017; it owns neither the route nor audit logging. */
-    void startAttention(AuthenticatedIdentity identity, UUID emergencyId);
+    boolean startAttention(AuthenticatedIdentity identity, UUID emergencyId);
 
     /** Called by the HU-API-018 scheduler after it has selected a possible timeout candidate. */
     void markOfflineIfTimedOut(UUID emergencyId);

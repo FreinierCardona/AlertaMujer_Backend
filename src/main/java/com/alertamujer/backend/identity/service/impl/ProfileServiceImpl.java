@@ -135,9 +135,24 @@ class ProfileServiceImpl implements ProfileService {
     @Override @Transactional
     public void deleteAccount(AuthenticatedIdentity identity) {
         UserProfileData user = requireUser(identity, true);
-        if (repository.hasOpenEmergency(user.id())) throw new StateConflictException();
-        List<String> references = repository.findEvidenceReferences(user.id());
-        repository.deleteUser(user.id());
+        deleteUserSafely(user.id());
+    }
+
+    @Override @Transactional
+    public void deleteDisabledUserForAdministration(UUID userId) {
+        var user = repository.lockAdministrativeDeletionCandidate(userId).orElseThrow(ResourceNotFoundException::new);
+        Instant cutoff = clock.instant().minus(15, java.time.temporal.ChronoUnit.DAYS);
+        if (!"USER".equals(user.role()) || !"DISABLED".equals(user.accountStatus())
+                || user.disabledAt() == null || user.disabledAt().isAfter(cutoff)) {
+            throw new RuleViolationException();
+        }
+        deleteUserSafely(user.id());
+    }
+
+    private void deleteUserSafely(UUID userId) {
+        if (repository.hasOpenEmergency(userId)) throw new StateConflictException();
+        List<String> references = repository.findEvidenceReferences(userId);
+        repository.deleteUser(userId);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() { evidenceFileCleanup.deleteAfterAccountRemoval(references); }

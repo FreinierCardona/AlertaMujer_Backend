@@ -37,7 +37,7 @@ class ProfilePostgreSqlIntegrationTest {
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of("spring.profiles.active", "test", "spring.datasource.url", url,
                 "spring.datasource.username", username, "spring.datasource.password", password, "spring.main.banner-mode", "off",
-                "EVIDENCE_STORAGE_PATH", evidenceDirectory.toString()));
+                "evidence.storage-path", evidenceDirectory.toString()));
         try (ConfigurableApplicationContext context = application.run()) {
             JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
             ProfileService service = context.getBean(ProfileService.class);
@@ -80,7 +80,7 @@ class ProfilePostgreSqlIntegrationTest {
                 assertThat(jdbc.queryForObject("select accepted_terms_at is not null from identity.users where user_id = ?",
                         Boolean.class, adminId)).isTrue();
 
-                String fileReference = "account-" + suffix + ".webp";
+                String fileReference = UUID.randomUUID() + ".webp";
                 Files.createFile(evidenceDirectory.resolve(fileReference));
                 UUID emergencyId = UUID.randomUUID();
                 jdbc.update("""

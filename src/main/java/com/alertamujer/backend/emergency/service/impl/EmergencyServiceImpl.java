@@ -8,6 +8,8 @@ import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
 import com.alertamujer.backend.emergency.service.EmergencyService;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.ForbiddenException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
@@ -31,23 +33,30 @@ class EmergencyServiceImpl implements EmergencyService {
     private final SystemConfigurationValues configuration;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditService auditService;
 
     @Autowired
     EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration,
-            ApplicationEventPublisher eventPublisher) {
-        this(repository, configuration, Clock.systemUTC(), eventPublisher);
+            ApplicationEventPublisher eventPublisher, AuditService auditService) {
+        this(repository, configuration, Clock.systemUTC(), eventPublisher, auditService);
     }
 
     EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock) {
-        this(repository, configuration, clock, event -> { });
+        this(repository, configuration, clock, event -> { }, AuditService.noop());
     }
 
     EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock,
             ApplicationEventPublisher eventPublisher) {
+        this(repository, configuration, clock, eventPublisher, AuditService.noop());
+    }
+
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock,
+            ApplicationEventPublisher eventPublisher, AuditService auditService) {
         this.repository = repository;
         this.configuration = configuration;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
+        this.auditService = auditService;
     }
 
     @Override
@@ -86,8 +95,16 @@ class EmergencyServiceImpl implements EmergencyService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public EmergencyResponse ownEmergency(AuthenticatedIdentity identity, UUID emergencyId) {
+        if ("ENTITY_ADMIN".equals(identity.role())) {
+            if (repository.findEnabledAdministrator(identity.userId()).isEmpty()) throw new ForbiddenException();
+            EmergencyData emergency = repository.findEmergency(emergencyId).orElseThrow(ResourceNotFoundException::new);
+            UUID ownerUserId = repository.findEmergencyOwner(emergencyId).orElseThrow(ResourceNotFoundException::new);
+            auditService.record(AuditEvent.success(identity.userId(), ownerUserId, "ALERT_VIEWED", "EMERGENCY", emergencyId,
+                    null, null, "Administrative emergency detail viewed."));
+            return response(emergency);
+        }
         UUID userId = requireEnabledUser(identity, false);
         return repository.findOwnEmergency(emergencyId, userId).map(this::response).orElseThrow(ResourceNotFoundException::new);
     }
@@ -148,19 +165,20 @@ class EmergencyServiceImpl implements EmergencyService {
 
     @Override
     @Transactional
-    public void startAttention(AuthenticatedIdentity identity, UUID emergencyId) {
+    public boolean startAttention(AuthenticatedIdentity identity, UUID emergencyId) {
         if (!"ENTITY_ADMIN".equals(identity.role())
                 || repository.findEnabledAdministrator(identity.userId()).isEmpty()) {
             throw new ForbiddenException();
         }
         EmergencyData emergency = repository.lockEmergency(emergencyId).orElseThrow(ResourceNotFoundException::new);
         if ("IN_PROGRESS".equals(emergency.status())) {
-            return;
+            return false;
         }
         if (!"ACTIVE".equals(emergency.status())) {
             throw new StateConflictException();
         }
         transition(emergency, "IN_PROGRESS", null, identity.userId(), clock.instant(), false);
+        return true;
     }
 
     @Override

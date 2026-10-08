@@ -12,6 +12,8 @@ import com.alertamujer.backend.identity.repository.IdentityAuthenticationReposit
 import com.alertamujer.backend.identity.service.AuthenticationService;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import com.alertamujer.backend.shared.errors.UnauthorizedException;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import com.alertamujer.backend.shared.security.JwtAccessTokenService;
 import java.security.SecureRandom;
@@ -40,19 +42,23 @@ class AuthenticationServiceImpl implements AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtAccessTokenService jwt;
     private final Clock clock;
+    private final AuditService auditService;
 
     @Autowired
     AuthenticationServiceImpl(IdentityAuthenticationRepository repository, PasswordEncoder passwordEncoder,
-            JwtAccessTokenService jwt) {
-        this(repository, passwordEncoder, jwt, Clock.systemUTC());
+            JwtAccessTokenService jwt, AuditService auditService) {
+        this(repository, passwordEncoder, jwt, Clock.systemUTC(), auditService);
     }
 
     AuthenticationServiceImpl(IdentityAuthenticationRepository repository, PasswordEncoder passwordEncoder,
             JwtAccessTokenService jwt, Clock clock) {
-        this.repository = repository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwt = jwt;
-        this.clock = clock;
+        this(repository, passwordEncoder, jwt, clock, AuditService.noop());
+    }
+
+    AuthenticationServiceImpl(IdentityAuthenticationRepository repository, PasswordEncoder passwordEncoder,
+            JwtAccessTokenService jwt, Clock clock, AuditService auditService) {
+        this.repository = repository; this.passwordEncoder = passwordEncoder; this.jwt = jwt;
+        this.clock = clock; this.auditService = auditService;
     }
 
     @Override
@@ -73,6 +79,10 @@ class AuthenticationServiceImpl implements AuthenticationService {
         repository.createSession(sessionId, user.id(), passwordEncoder.encode(refreshToken), clientType(user),
                 sessionExpiration(user, now), now);
         repository.markLogin(user.id(), now);
+        if ("ENTITY_ADMIN".equals(user.role())) {
+            auditService.record(AuditEvent.success(user.id(), user.id(), "ADMIN_LOGIN", "USER", user.id(),
+                    null, null, "Administrative session started."));
+        }
         return sessionResponse(user, sessionId, refreshToken, now);
     }
 
