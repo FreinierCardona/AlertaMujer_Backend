@@ -103,16 +103,24 @@ class LocalEvidenceStorage implements EvidenceStorage {
             Iterator<Path> iterator = files.iterator();
             while (iterator.hasNext()) {
                 Path candidate = iterator.next();
-                String name = candidate.getFileName().toString();
-                if (!name.endsWith(".webp") || referenced.contains(name) || !Files.isRegularFile(candidate)) continue;
-                FileTime modified = Files.getLastModifiedTime(candidate);
-                if (modified.toInstant().isAfter(cutoff)) continue;
-                if (deleteTwice(candidate, "Evidence reconciliation cleanup failed; a later run will retry.")) removed++;
+                if (deleteIfOrphanedAndOld(candidate, referenced, cutoff)) removed++;
             }
         } catch (IOException exception) {
             LOGGER.warn("Evidence reconciliation scan failed; a later run will retry.");
         }
         return removed;
+    }
+
+    private boolean deleteIfOrphanedAndOld(Path candidate, Set<String> referenced, Instant cutoff) {
+        try {
+            String name = candidate.getFileName().toString();
+            if (!name.endsWith(".webp") || referenced.contains(name) || !Files.isRegularFile(candidate)) return false;
+            if (Files.getLastModifiedTime(candidate).toInstant().isAfter(cutoff)) return false;
+            return deleteTwice(candidate, "Evidence reconciliation cleanup failed; a later run will retry.");
+        } catch (IOException exception) {
+            LOGGER.warn("Evidence reconciliation skipped one file; a later run will retry.");
+            return false;
+        }
     }
 
     private void validateSource(MultipartFile source) {

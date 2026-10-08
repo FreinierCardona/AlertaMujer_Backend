@@ -101,8 +101,34 @@ public class AdministrationRepository {
         jdbc.update("""
                 update identity.users
                    set account_status = ?, disabled_at = case when ? = 'DISABLED' then ?::timestamptz else null end, updated_at = ?
-                 where user_id = ?
+                where user_id = ?
                 """, status, status, Timestamp.from(now), Timestamp.from(now), userId);
+    }
+
+    public List<UUID> findInactiveEnabledUserIds(Instant cutoff, int limit) {
+        return jdbc.query("""
+                select user_id
+                  from identity.users
+                 where role = 'USER'
+                   and account_status = 'ENABLED'
+                   and coalesce(last_activity_at, last_login_at, created_at) <= ?
+                 order by user_id
+                 limit ?
+                """, (rs, row) -> rs.getObject(1, UUID.class), Timestamp.from(cutoff), limit);
+    }
+
+    /** The eligibility predicate is repeated in the update to prevent a stale job selection from disabling a fresh login. */
+    public boolean disableUserIfStillInactive(UUID userId, Instant cutoff, Instant now) {
+        return jdbc.update("""
+                update identity.users
+                   set account_status = 'DISABLED',
+                       disabled_at = ?,
+                       updated_at = ?
+                 where user_id = ?
+                   and role = 'USER'
+                   and account_status = 'ENABLED'
+                   and coalesce(last_activity_at, last_login_at, created_at) <= ?
+                """, Timestamp.from(now), Timestamp.from(now), userId, Timestamp.from(cutoff)) == 1;
     }
 
     public void revokeAllSessions(UUID userId, Instant now) {

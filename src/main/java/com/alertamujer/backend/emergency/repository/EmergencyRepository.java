@@ -100,6 +100,21 @@ public class EmergencyRepository {
         return lockedEmergency("where emergency_id = ?", emergencyId);
     }
 
+    /**
+     * Finds a short candidate batch only. The service locks and revalidates each
+     * row before changing it because a heartbeat may arrive after this query.
+     */
+    public List<UUID> findTimedOutEmergencyIds(Instant cutoff, int limit) {
+        return jdbc.query("""
+                select emergency_id
+                  from emergency.emergencies
+                 where status in ('ACTIVE', 'IN_PROGRESS')
+                   and coalesce(last_heartbeat_at, started_at) <= ?
+                 order by emergency_id
+                 limit ?
+                """, (rs, row) -> rs.getObject(1, UUID.class), Timestamp.from(cutoff), limit);
+    }
+
     private Optional<EmergencyData> lockedEmergency(String condition, Object... args) {
         List<EmergencyData> rows = jdbc.query("""
                 select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at

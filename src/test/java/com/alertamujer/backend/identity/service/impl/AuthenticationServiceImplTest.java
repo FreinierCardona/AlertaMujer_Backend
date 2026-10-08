@@ -56,6 +56,7 @@ class AuthenticationServiceImplTest {
         when(repository.findUserByIdentifier("ana@example.com")).thenReturn(Optional.of(user));
         when(repository.readPasswordHash(user.id())).thenReturn("stored-password-hash");
         when(passwordEncoder.matches("SecurePass#2026", "stored-password-hash")).thenReturn(true);
+        when(repository.lockUser(user.id())).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(anyString())).thenReturn("stored-refresh-hash");
         when(jwt.issue(any(), eq(now), eq(now.plusSeconds(900)))).thenReturn("access-token");
 
@@ -69,6 +70,21 @@ class AuthenticationServiceImplTest {
         assertThat(response.termsPending()).isFalse();
         assertThat(response.user().email()).isEqualTo("ana@example.com");
         verify(repository).markLogin(user.id(), now);
+    }
+
+    @Test
+    void loginRejectsAnAccountDisabledWhileThePasswordWasBeingChecked() {
+        UserAccount disabled = new UserAccount(user.id(), user.username(), user.firstNames(), user.lastNames(), user.email(),
+                user.phone(), user.role(), "DISABLED", user.accountOrigin(), user.acceptedTermsAt());
+        when(repository.findUserByIdentifier("ana@example.com")).thenReturn(Optional.of(user));
+        when(repository.readPasswordHash(user.id())).thenReturn("stored-password-hash");
+        when(passwordEncoder.matches("SecurePass#2026", "stored-password-hash")).thenReturn(true);
+        when(repository.lockUser(user.id())).thenReturn(Optional.of(disabled));
+
+        assertThatThrownBy(() -> service.login(new LoginInput("ana@example.com", "SecurePass#2026")))
+                .isInstanceOf(UnauthorizedException.class);
+
+        verify(repository, never()).createSession(any(), any(), anyString(), anyString(), any(), any());
     }
 
     @Test

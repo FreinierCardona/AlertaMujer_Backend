@@ -73,6 +73,12 @@ class AuthenticationServiceImpl implements AuthenticationService {
         if (!user.isEnabled() || !passwordEncoder.matches(input.password(), passwordHash)) {
             throw new UnauthorizedException();
         }
+        // The inactivity job locks the same root row. Revalidate after the password work so it cannot
+        // disable an account that has just logged in, nor create a session after it has been disabled.
+        user = repository.lockUser(user.id()).orElseThrow(UnauthorizedException::new);
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException();
+        }
         Instant now = clock.instant();
         UUID sessionId = UUID.randomUUID();
         String refreshToken = refreshToken(sessionId);

@@ -146,6 +146,20 @@ class AdministrationServiceImpl implements AdministrationService {
     }
 
     @Override @Transactional
+    public boolean disableUserIfStillInactive(UUID userId) {
+        ManagedUserData user = repository.lockManagedUser(userId).orElse(null);
+        if (user == null || !"USER".equals(user.role()) || !"ENABLED".equals(user.accountStatus())) return false;
+        Instant now = clock.instant();
+        Instant cutoff = now.atZone(ZoneOffset.UTC).minusMonths(3).toInstant();
+        if (!isInactiveSince(user, cutoff) || !repository.disableUserIfStillInactive(user.id(), cutoff, now)) return false;
+        repository.revokeAllSessions(user.id(), now);
+        auditService.record(AuditEvent.success(null, user.id(), "ACCOUNT_STATUS_CHANGED", "USER", user.id(),
+                Map.of("accountStatus", "ENABLED"), Map.of("accountStatus", "DISABLED"),
+                "Account disabled by the inactivity job."));
+        return true;
+    }
+
+    @Override @Transactional
     public void replaceAdministrator(UUID targetUserId) {
         ReplacementUserData outgoing = repository.lockCurrentAdministrator().orElseThrow(RuleViolationException::new);
         ReplacementUserData target = repository.lockReplacementTarget(targetUserId).orElseThrow(ResourceNotFoundException::new);
@@ -162,9 +176,13 @@ class AdministrationServiceImpl implements AdministrationService {
     }
 
     private boolean isInactiveForTwoMonths(ManagedUserData user) {
+        Instant cutoff = clock.instant().atZone(ZoneOffset.UTC).minusMonths(2).toInstant();
+        return isInactiveSince(user, cutoff);
+    }
+
+    private boolean isInactiveSince(ManagedUserData user, Instant cutoff) {
         Instant lastActivity = user.lastActivityAt() != null ? user.lastActivityAt()
                 : user.lastLoginAt() != null ? user.lastLoginAt() : user.createdAt();
-        Instant cutoff = clock.instant().atZone(ZoneOffset.UTC).minusMonths(2).toInstant();
         return !lastActivity.isAfter(cutoff);
     }
 
