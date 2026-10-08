@@ -1,5 +1,6 @@
 package com.alertamujer.backend.administration.service.impl;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -109,6 +110,22 @@ class AdministrationServiceImplTest {
         when(repository.lockManagedUser(userId)).thenReturn(Optional.of(new ManagedUserData(userId, "ENTITY_ADMIN", "ENABLED",
                 null, null, null, now.minusSeconds(1))));
         assertThatThrownBy(() -> service.changeStatus(administrator, userId, "DISABLED")).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void inactivityJobRevalidatesTheThreeMonthThresholdAndAuditsAsSystem() {
+        UUID userId = UUID.randomUUID();
+        Instant cutoff = now.atZone(ZoneOffset.UTC).minusMonths(3).toInstant();
+        when(repository.lockManagedUser(userId)).thenReturn(Optional.of(new ManagedUserData(userId, "USER", "ENABLED",
+                null, cutoff.minusSeconds(1), null, now.minusSeconds(1))));
+        when(repository.disableUserIfStillInactive(userId, cutoff, now)).thenReturn(true);
+
+        assertThat(service.disableUserIfStillInactive(userId)).isTrue();
+
+        verify(repository).disableUserIfStillInactive(userId, cutoff, now);
+        verify(repository).revokeAllSessions(userId, now);
+        verify(audit).record(org.mockito.ArgumentMatchers.argThat(event -> event.actorUserId() == null
+                && "ACCOUNT_STATUS_CHANGED".equals(event.action()) && userId.equals(event.subjectUserId())));
     }
 
     @Test
