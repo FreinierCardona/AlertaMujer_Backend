@@ -1,5 +1,12 @@
 # AlertaMujer Backend
 
+## Operación administrativa local
+
+El reemplazo del único `ENTITY_ADMIN` no tiene endpoint. En un arranque con perfil `local`, define temporalmente
+`ADMIN_REPLACEMENT_TARGET_USER_ID` con el UUID de una cuenta `USER` habilitada y ya verificada; el comando revoca
+las sesiones administrativas, inhabilita/degrada el administrador saliente y promueve el destino en una transacción.
+Retira la variable después de ejecutarlo.
+
 Backend monolítico de AlertaMujer construido con Java y Spring Boot. Este
 repositorio contiene el arranque de la aplicación, su configuración base y
 pruebas de contexto; aún no incluye endpoints ni lógica de negocio.

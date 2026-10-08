@@ -78,6 +78,20 @@ public class EmergencyRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<EmergencyData> findEmergency(UUID emergencyId) {
+        List<EmergencyData> rows = jdbc.query("""
+                select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
+                  from emergency.emergencies where emergency_id = ?
+                """, emergencyMapper(), emergencyId);
+        return rows.stream().findFirst();
+    }
+
+    public Optional<UUID> findEmergencyOwner(UUID emergencyId) {
+        List<UUID> owners = jdbc.query("select user_id from emergency.emergencies where emergency_id = ?",
+                (rs, row) -> rs.getObject(1, UUID.class), emergencyId);
+        return owners.stream().findFirst();
+    }
+
     public Optional<EmergencyData> lockOwnEmergency(UUID emergencyId, UUID userId) {
         return lockedEmergency("where emergency_id = ? and user_id = ?", emergencyId, userId);
     }

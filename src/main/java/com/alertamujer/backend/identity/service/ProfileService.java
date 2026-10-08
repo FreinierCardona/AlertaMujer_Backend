@@ -19,4 +19,5 @@ public interface ProfileService {
     SosMessageResponse getEmergencySettings(AuthenticatedIdentity identity);
     SosMessageResponse saveEmergencySettings(AuthenticatedIdentity identity, SosMessageInput input);
     void deleteAccount(AuthenticatedIdentity identity);
+    void deleteDisabledUserForAdministration(java.util.UUID userId);
 }
