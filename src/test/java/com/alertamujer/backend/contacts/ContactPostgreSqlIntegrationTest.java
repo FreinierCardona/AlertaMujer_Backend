@@ -85,7 +85,9 @@ class ContactPostgreSqlIntegrationTest {
                 assertThat(jdbc.queryForObject("select relationship_status from contacts.emergency_contacts where contact_id = ?",
                         String.class, firstContactId)).isEqualTo("ACCEPTED");
                 assertThat(service.ownContacts(firstIdentity, 0, 20).items()).anyMatch(contact ->
-                        contact.contactId().equals(firstContactId) && contact.eligible());
+                        contact.contactId().equals(firstContactId)
+                                && contact.eligible()
+                                && contact.counterpart().username().equals(secondUsername));
 
                 jdbc.update("update identity.users set account_status = 'DISABLED', disabled_at = ?, updated_at = ? where user_id = ?",
                         Timestamp.from(Instant.now()), Timestamp.from(Instant.now()), second);

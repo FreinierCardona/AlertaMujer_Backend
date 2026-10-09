@@ -122,6 +122,8 @@ public class ContactRepository {
     public List<OwnContactData> findOwnContacts(UUID userId, int size, long offset) {
         return jdbc.query("""
                 select relation.contact_id, relation.relationship_status, relation.expires_at,
+                       relation.owner_user_id = ? as sent_by_actor,
+                       other.username::text, other.first_names, other.last_names,
                        other.role = 'USER' and other.account_status = 'ENABLED' as eligible
                   from contacts.emergency_contacts relation
                   join identity.users other on other.user_id =
@@ -129,8 +131,15 @@ public class ContactRepository {
                  where relation.owner_user_id = ? or relation.contact_user_id = ?
                  order by relation.updated_at desc, relation.contact_id asc
                  limit ? offset ?
-                """, (rs, row) -> new OwnContactData(rs.getObject(1, UUID.class), rs.getString(2), instant(rs.getTimestamp(3)),
-                rs.getBoolean(4)), userId, userId, userId, size, offset);
+                """, (rs, row) -> new OwnContactData(
+                rs.getObject(1, UUID.class),
+                rs.getString(2),
+                instant(rs.getTimestamp(3)),
+                rs.getBoolean(4),
+                rs.getString(5),
+                rs.getString(6),
+                rs.getString(7),
+                rs.getBoolean(8)), userId, userId, userId, userId, size, offset);
     }
 
     public long countOwnContacts(UUID userId) {
@@ -159,5 +168,13 @@ public class ContactRepository {
     public record UserData(UUID id, String username) { }
     public record DirectoryUserData(String username, String firstNames, String lastNames) { }
     public record ContactData(UUID id, UUID ownerId, UUID targetId, String status, Instant expiresAt, Instant statusChangedAt) { }
-    public record OwnContactData(UUID id, String status, Instant expiresAt, boolean eligible) { }
+    public record OwnContactData(
+            UUID id,
+            String status,
+            Instant expiresAt,
+            boolean sentByActor,
+            String counterpartUsername,
+            String counterpartFirstNames,
+            String counterpartLastNames,
+            boolean eligible) { }
 }

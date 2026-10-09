@@ -16,6 +16,7 @@ import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -130,7 +131,7 @@ class ContactServiceImpl implements ContactService {
         repository.expirePendingForUser(actor.id(), clock.instant());
         long total = repository.countOwnContacts(actor.id());
         return new PageResponse<>(repository.findOwnContacts(actor.id(), size, offset(page, size)).stream()
-                .map(contact -> new ContactResponse(contact.id(), contact.status(), contact.expiresAt(), contact.eligible())).toList(),
+                .map(this::response).toList(),
                 page, size, total);
     }
 
@@ -159,6 +160,26 @@ class ContactServiceImpl implements ContactService {
 
     private ContactInvitationResponse response(ContactData relation) {
         return new ContactInvitationResponse(relation.id(), relation.status(), relation.expiresAt());
+    }
+
+    private ContactResponse response(ContactRepository.OwnContactData contact) {
+        ContactResponse.Direction direction = contact.sentByActor()
+                ? ContactResponse.Direction.SENT
+                : ContactResponse.Direction.RECEIVED;
+        return new ContactResponse(contact.id(), contact.status(), contact.expiresAt(), contact.eligible(),
+                new ContactResponse.Counterpart(contact.counterpartUsername(), contact.counterpartFirstNames(),
+                        contact.counterpartLastNames()),
+                direction, allowedActions(contact.status(), direction));
+    }
+
+    private List<ContactResponse.Action> allowedActions(String status, ContactResponse.Direction direction) {
+        if ("PENDING".equals(status) && direction == ContactResponse.Direction.RECEIVED) {
+            return List.of(ContactResponse.Action.ACCEPT, ContactResponse.Action.REJECT);
+        }
+        if ("EXPIRED".equals(status) && direction == ContactResponse.Direction.SENT) {
+            return List.of(ContactResponse.Action.REINVITE);
+        }
+        return List.of();
     }
 
     private long offset(int page, int size) {
