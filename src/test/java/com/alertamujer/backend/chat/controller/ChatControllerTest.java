@@ -41,12 +41,16 @@ class ChatControllerTest {
     void returnsPersistedMessagesAfterTheConfirmedServerIdentifier() throws Exception {
         UUID emergencyId = UUID.randomUUID();
         UUID clientMessageId = UUID.randomUUID();
+        UUID senderUserId = UUID.randomUUID();
         when(service.list(any(), eq(emergencyId), eq(40L), eq(20))).thenReturn(List.of(
-                new ChatMessageResponse(41L, clientMessageId, "Help", Instant.parse("2026-10-07T18:00:00Z"))));
+                new ChatMessageResponse(41L, clientMessageId, senderUserId, "USER", "Help",
+                        Instant.parse("2026-10-07T18:00:00Z"))));
 
         mockMvc.perform(get("/api/v1/emergencies/{emergencyId}/messages", emergencyId).param("after", "40"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].messageId").value(41))
                 .andExpect(jsonPath("$[0].clientMessageId").value(clientMessageId.toString()))
+                .andExpect(jsonPath("$[0].senderUserId").value(senderUserId.toString()))
+                .andExpect(jsonPath("$[0].senderRole").value("USER"))
                 .andExpect(jsonPath("$[0].content").value("Help"));
         verify(service).list(any(), eq(emergencyId), eq(40L), eq(20));
     }
