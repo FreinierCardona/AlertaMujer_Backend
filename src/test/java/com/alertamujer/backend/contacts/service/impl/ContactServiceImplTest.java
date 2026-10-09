@@ -127,11 +127,30 @@ class ContactServiceImplTest {
         UUID contactId = UUID.randomUUID();
         when(repository.countOwnContacts(ownerId)).thenReturn(1L);
         when(repository.findOwnContacts(ownerId, 20, 0)).thenReturn(List.of(
-                new OwnContactData(contactId, "ACCEPTED", null, false)));
+                new OwnContactData(contactId, "ACCEPTED", null, true, "@bea", "Bea", "Rojas", false)));
 
         var page = service.ownContacts(owner, 0, 20);
 
         verify(repository).expirePendingForUser(ownerId, now);
-        assertThat(page.items()).containsExactly(new ContactResponse(contactId, "ACCEPTED", null, false));
+        assertThat(page.items()).containsExactly(new ContactResponse(contactId, "ACCEPTED", null, false,
+                new ContactResponse.Counterpart("@bea", "Bea", "Rojas"), ContactResponse.Direction.SENT, List.of()));
+    }
+
+    @Test
+    void exposesOnlyTheBackendAuthorizedActionsForTheCurrentParticipant() {
+        UUID receivedId = UUID.randomUUID();
+        UUID expiredId = UUID.randomUUID();
+        when(repository.countOwnContacts(ownerId)).thenReturn(2L);
+        when(repository.findOwnContacts(ownerId, 20, 0)).thenReturn(List.of(
+                new OwnContactData(receivedId, "PENDING", now.plusSeconds(60), false, "@bea", "Bea", "Rojas", true),
+                new OwnContactData(expiredId, "EXPIRED", null, true, "@carla", "Carla", "Mora", true)));
+
+        var page = service.ownContacts(owner, 0, 20);
+
+        assertThat(page.items().get(0).direction()).isEqualTo(ContactResponse.Direction.RECEIVED);
+        assertThat(page.items().get(0).allowedActions())
+                .containsExactly(ContactResponse.Action.ACCEPT, ContactResponse.Action.REJECT);
+        assertThat(page.items().get(1).direction()).isEqualTo(ContactResponse.Direction.SENT);
+        assertThat(page.items().get(1).allowedActions()).containsExactly(ContactResponse.Action.REINVITE);
     }
 }
