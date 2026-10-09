@@ -3,5 +3,12 @@ package com.alertamujer.backend.chat.dto.response;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Public, persisted chat message representation shared by REST and STOMP. */
-public record ChatMessageResponse(long messageId, UUID clientMessageId, String content, Instant sentAt) { }
+/**
+ * Public persisted chat representation shared by REST recovery and STOMP.
+ *
+ * <p>The presentation context intentionally contains only the authorized sender
+ * identifier and current role. It lets each participant distinguish its own
+ * message from the other participant without exposing a name, email or phone.</p>
+ */
+public record ChatMessageResponse(long messageId, UUID clientMessageId, UUID senderUserId,
+        String senderRole, String content, Instant sentAt) { }

@@ -106,6 +106,7 @@ class ChatServiceImpl implements ChatService {
     private boolean isOperational(String status) { return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status); }
 
     private ChatMessageResponse response(ChatMessageData message) {
-        return new ChatMessageResponse(message.id(), message.clientMessageId(), message.content(), message.sentAt());
+        return new ChatMessageResponse(message.id(), message.clientMessageId(), message.senderUserId(),
+                message.senderRole(), message.content(), message.sentAt());
     }
 }

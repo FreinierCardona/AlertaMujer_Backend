@@ -59,6 +59,8 @@ class ChatPostgreSqlIntegrationTest {
                 var second = service.send(identity, emergency, new ChatMessageInput(UUID.randomUUID(), "second"));
 
                 assertThat(repeated.messageId()).isEqualTo(first.messageId());
+                assertThat(first.senderUserId()).isEqualTo(owner);
+                assertThat(first.senderRole()).isEqualTo("USER");
                 assertThat(jdbc.queryForObject("select count(*) from emergency.emergency_chat_messages where emergency_id = ?",
                         Integer.class, emergency)).isEqualTo(2);
                 assertThat(service.list(identity, emergency, first.messageId(), 20)).extracting(message -> message.messageId())

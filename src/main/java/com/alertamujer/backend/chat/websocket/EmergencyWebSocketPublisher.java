@@ -19,7 +19,8 @@ class EmergencyWebSocketPublisher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void afterMessageCommit(EmergencyMessageCreatedEvent event) {
         messaging.convertAndSend(topic(event.emergencyId()), new MessageEvent("EMERGENCY_MESSAGE_CREATED", event.emergencyId(),
-                event.message().messageId(), event.message().clientMessageId(), event.message().content(), event.message().sentAt()));
+                event.message().messageId(), event.message().clientMessageId(), event.message().senderUserId(),
+                event.message().senderRole(), event.message().content(), event.message().sentAt()));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -30,6 +31,7 @@ class EmergencyWebSocketPublisher {
 
     private String topic(UUID emergencyId) { return "/topic/emergencies/" + emergencyId; }
 
-    private record MessageEvent(String type, UUID emergencyId, long messageId, UUID clientMessageId, String content, Instant sentAt) { }
+    private record MessageEvent(String type, UUID emergencyId, long messageId, UUID clientMessageId,
+            UUID senderUserId, String senderRole, String content, Instant sentAt) { }
     private record StatusEvent(String type, UUID emergencyId, String status, Instant occurredAt) { }
 }
