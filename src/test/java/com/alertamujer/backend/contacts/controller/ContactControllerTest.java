@@ -11,11 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.alertamujer.backend.contacts.dto.response.ContactInvitationResponse;
+import com.alertamujer.backend.contacts.dto.response.ContactResponse;
+import com.alertamujer.backend.contacts.dto.response.PageResponse;
 import com.alertamujer.backend.contacts.service.ContactService;
 import com.alertamujer.backend.shared.errors.GlobalExceptionHandler;
 import com.alertamujer.backend.shared.observability.RequestIdFilter;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +81,28 @@ class ContactControllerTest {
 
         verify(service, never()).directory(any(), any(), any(Integer.class), any(Integer.class));
         verify(service, never()).ownContacts(any(), any(Integer.class), any(Integer.class));
+    }
+
+    @Test
+    void returnsOnlySafeCounterpartPresentationAndBackendAuthorizedActions() throws Exception {
+        UUID contactId = UUID.randomUUID();
+        when(service.ownContacts(any(), any(Integer.class), any(Integer.class))).thenReturn(new PageResponse<>(List.of(
+                new ContactResponse(contactId, "PENDING", Instant.parse("2026-10-08T18:00:00Z"), true,
+                        new ContactResponse.Counterpart("@bea", "Bea", "Rojas"),
+                        ContactResponse.Direction.RECEIVED,
+                        List.of(ContactResponse.Action.ACCEPT, ContactResponse.Action.REJECT))), 0, 20, 1));
+
+        mockMvc.perform(get("/api/v1/contacts").param("page", "0").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].contactId").value(contactId.toString()))
+                .andExpect(jsonPath("$.items[0].counterpart.username").value("@bea"))
+                .andExpect(jsonPath("$.items[0].counterpart.firstNames").value("Bea"))
+                .andExpect(jsonPath("$.items[0].counterpart.lastNames").value("Rojas"))
+                .andExpect(jsonPath("$.items[0].direction").value("RECEIVED"))
+                .andExpect(jsonPath("$.items[0].allowedActions[0]").value("ACCEPT"))
+                .andExpect(jsonPath("$.items[0].allowedActions[1]").value("REJECT"))
+                .andExpect(jsonPath("$.items[0].counterpart.email").doesNotExist())
+                .andExpect(jsonPath("$.items[0].counterpart.phone").doesNotExist());
     }
 
     private HandlerMethodArgumentResolver identityResolver() {
