@@ -3,6 +3,7 @@ package com.alertamujer.backend.emergency.controller;
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.EmergencyFinishInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
+import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
 import com.alertamujer.backend.emergency.service.EmergencyService;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
@@ -42,7 +43,8 @@ public class EmergencyController {
     }
 
     @GetMapping("/{emergencyId}")
-    public EmergencyResponse ownEmergency(@AuthenticationPrincipal AuthenticatedIdentity identity, @PathVariable UUID emergencyId) {
+    public EmergencyDetailResponse ownEmergency(@AuthenticationPrincipal AuthenticatedIdentity identity,
+            @PathVariable UUID emergencyId) {
         return emergencyService.ownEmergency(identity, emergencyId);
     }
 

@@ -13,6 +13,7 @@ import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
+import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyDetailData;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.UserData;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
@@ -106,6 +107,22 @@ class EmergencyServiceImplTest {
         when(repository.findOpenEmergency(userId, false)).thenReturn(Optional.of(existing));
 
         assertThat(service.active(identity).emergencyId()).isEqualTo(emergencyId);
+    }
+
+    @Test
+    void returnsOnlyTheOwnersAuthorizedDetailWithItsLastConfirmedLocation() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyDetailData detail = new EmergencyDetailData(emergencyId, "ACTIVE", null, now.minusSeconds(30), now,
+                null, "Snapshot", new BigDecimal("4.609710"), new BigDecimal("-74.081750"),
+                new BigDecimal("8.5"), now.minusSeconds(2), now.minusSeconds(1));
+        when(repository.findOwnEmergencyDetail(emergencyId, userId)).thenReturn(Optional.of(detail));
+
+        var response = service.ownEmergency(identity, emergencyId);
+
+        assertThat(response.messageSnapshot()).isEqualTo("Snapshot");
+        assertThat(response.lastConfirmedLocation().latitude()).isEqualByComparingTo("4.609710");
+        assertThat(response.lastConfirmedLocation().capturedAt()).isEqualTo(now.minusSeconds(2));
+        verify(repository).findOwnEmergencyDetail(emergencyId, userId);
     }
 
     @Test
