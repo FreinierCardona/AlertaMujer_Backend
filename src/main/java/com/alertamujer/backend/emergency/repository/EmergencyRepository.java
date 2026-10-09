@@ -78,12 +78,20 @@ public class EmergencyRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<EmergencyDetailData> findOwnEmergencyDetail(UUID emergencyId, UUID userId) {
+        return findEmergencyDetail("where emergency.emergency_id = ? and emergency.user_id = ?", emergencyId, userId);
+    }
+
     public Optional<EmergencyData> findEmergency(UUID emergencyId) {
         List<EmergencyData> rows = jdbc.query("""
                 select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
                   from emergency.emergencies where emergency_id = ?
                 """, emergencyMapper(), emergencyId);
         return rows.stream().findFirst();
+    }
+
+    public Optional<EmergencyDetailData> findEmergencyDetail(UUID emergencyId) {
+        return findEmergencyDetail("where emergency.emergency_id = ?", emergencyId);
     }
 
     public Optional<UUID> findEmergencyOwner(UUID emergencyId) {
@@ -120,6 +128,25 @@ public class EmergencyRepository {
                 select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
                   from emergency.emergencies
                 """ + condition + " for update", emergencyMapper(), args);
+        return rows.stream().findFirst();
+    }
+
+    private Optional<EmergencyDetailData> findEmergencyDetail(String condition, Object... args) {
+        List<EmergencyDetailData> rows = jdbc.query("""
+                select emergency.emergency_id, emergency.status, emergency.previous_operational_status,
+                       emergency.started_at, emergency.last_heartbeat_at, emergency.finalized_at,
+                       emergency.message_snapshot,
+                       latest.latitude, latest.longitude, latest.accuracy_meters,
+                       latest.captured_at, latest.received_at
+                  from emergency.emergencies emergency
+                  left join lateral (
+                      select latitude, longitude, accuracy_meters, captured_at, received_at
+                        from emergency.emergency_locations
+                       where emergency_id = emergency.emergency_id
+                       order by received_at desc, location_id desc
+                       limit 1
+                  ) latest on true
+                """ + condition, emergencyDetailMapper(), args);
         return rows.stream().findFirst();
     }
 
@@ -228,6 +255,22 @@ public class EmergencyRepository {
                 instant(rs.getTimestamp(4)), instant(rs.getTimestamp(5)), instant(rs.getTimestamp(6)));
     }
 
+    private static org.springframework.jdbc.core.RowMapper<EmergencyDetailData> emergencyDetailMapper() {
+        return (rs, row) -> new EmergencyDetailData(
+                rs.getObject(1, UUID.class),
+                rs.getString(2),
+                rs.getString(3),
+                instant(rs.getTimestamp(4)),
+                instant(rs.getTimestamp(5)),
+                instant(rs.getTimestamp(6)),
+                rs.getString(7),
+                rs.getBigDecimal(8),
+                rs.getBigDecimal(9),
+                rs.getBigDecimal(10),
+                instant(rs.getTimestamp(11)),
+                instant(rs.getTimestamp(12)));
+    }
+
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
     }
@@ -239,4 +282,7 @@ public class EmergencyRepository {
     public record UserData(UUID id) { }
     public record EmergencyData(UUID id, String status, String previousOperationalStatus, Instant startedAt,
             Instant lastHeartbeatAt, Instant finalizedAt) { }
+    public record EmergencyDetailData(UUID id, String status, String previousOperationalStatus, Instant startedAt,
+            Instant lastHeartbeatAt, Instant finalizedAt, String messageSnapshot, BigDecimal latitude, BigDecimal longitude,
+            BigDecimal accuracyMeters, Instant capturedAt, Instant receivedAt) { }
 }

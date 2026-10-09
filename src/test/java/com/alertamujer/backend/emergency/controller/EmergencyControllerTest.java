@@ -4,11 +4,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse;
+import com.alertamujer.backend.emergency.dto.response.EmergencyLocationResponse;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
+import java.math.BigDecimal;
 import com.alertamujer.backend.emergency.service.EmergencyService;
 import com.alertamujer.backend.shared.errors.GlobalExceptionHandler;
 import com.alertamujer.backend.shared.observability.RequestIdFilter;
@@ -93,6 +97,25 @@ class EmergencyControllerTest {
 
         verify(service).heartbeat(any(), org.mockito.ArgumentMatchers.eq(emergencyId), any());
         verify(service).recordLocation(any(), org.mockito.ArgumentMatchers.eq(emergencyId), any());
+    }
+
+    @Test
+    void returnsAuthorizedDetailWithTheSnapshotAndLastConfirmedLocation() throws Exception {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyDetailResponse detail = new EmergencyDetailResponse(emergencyId, "ACTIVE", null,
+                Instant.parse("2026-10-07T18:00:00Z"), Instant.parse("2026-10-07T18:01:00Z"), null,
+                "Necesito ayuda", new EmergencyLocationResponse(new BigDecimal("4.609710"),
+                        new BigDecimal("-74.081750"), new BigDecimal("8.5"),
+                        Instant.parse("2026-10-07T18:00:50Z"), Instant.parse("2026-10-07T18:01:00Z")));
+        when(service.ownEmergency(any(), org.mockito.ArgumentMatchers.eq(emergencyId))).thenReturn(detail);
+
+        mockMvc.perform(get("/api/v1/emergencies/{emergencyId}", emergencyId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageSnapshot").value("Necesito ayuda"))
+                .andExpect(jsonPath("$.lastConfirmedLocation.latitude").value(4.609710))
+                .andExpect(jsonPath("$.lastConfirmedLocation.capturedAt").value("2026-10-07T18:00:50Z"));
+
+        verify(service).ownEmergency(any(), org.mockito.ArgumentMatchers.eq(emergencyId));
     }
 
     @Test

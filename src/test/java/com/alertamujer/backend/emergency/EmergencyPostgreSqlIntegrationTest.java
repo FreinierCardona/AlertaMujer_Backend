@@ -126,6 +126,10 @@ class EmergencyPostgreSqlIntegrationTest {
                 insertUser(jdbc, contact, "@lifecontacta" + suffix, suffix, 6);
                 insertAcceptedContact(jdbc, owner, contact);
                 UUID emergencyId = service.createOrRecover(identity(owner), input()).emergency().emergencyId();
+                var createdDetail = service.ownEmergency(identity(owner), emergencyId);
+                assertThat(createdDetail.messageSnapshot()).isNotBlank();
+                assertThat(createdDetail.lastConfirmedLocation().latitude()).isEqualByComparingTo("4.609710");
+                assertThat(createdDetail.lastConfirmedLocation().longitude()).isEqualByComparingTo("-74.081750");
 
                 jdbc.update("update emergency.emergencies set last_heartbeat_at = current_timestamp - interval '181 seconds' where emergency_id = ?",
                         emergencyId);
@@ -138,6 +142,9 @@ class EmergencyPostgreSqlIntegrationTest {
                 assertThat(status(jdbc, emergencyId)).isEqualTo("ACTIVE");
                 assertThat(jdbc.queryForObject("select count(*) from emergency.emergency_locations where emergency_id = ?",
                         Integer.class, emergencyId)).isEqualTo(2);
+                var recoveredDetail = service.ownEmergency(identity(owner), emergencyId);
+                assertThat(recoveredDetail.lastConfirmedLocation().latitude()).isEqualByComparingTo("4.610000");
+                assertThat(recoveredDetail.lastConfirmedLocation().accuracyMeters()).isEqualByComparingTo("7.5");
 
                 service.recordLocation(identity(owner), emergencyId, location());
                 service.finish(identity(owner), emergencyId);

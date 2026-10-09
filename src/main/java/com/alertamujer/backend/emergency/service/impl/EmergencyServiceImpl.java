@@ -2,11 +2,14 @@ package com.alertamujer.backend.emergency.service.impl;
 
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
+import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse;
+import com.alertamujer.backend.emergency.dto.response.EmergencyLocationResponse;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
 import com.alertamujer.backend.emergency.event.EmergencyCreatedEvent;
 import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
+import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyDetailData;
 import com.alertamujer.backend.emergency.service.EmergencyService;
 import com.alertamujer.backend.shared.audit.AuditEvent;
 import com.alertamujer.backend.shared.audit.AuditService;
@@ -96,17 +99,19 @@ class EmergencyServiceImpl implements EmergencyService {
 
     @Override
     @Transactional
-    public EmergencyResponse ownEmergency(AuthenticatedIdentity identity, UUID emergencyId) {
+    public EmergencyDetailResponse ownEmergency(AuthenticatedIdentity identity, UUID emergencyId) {
         if ("ENTITY_ADMIN".equals(identity.role())) {
             if (repository.findEnabledAdministrator(identity.userId()).isEmpty()) throw new ForbiddenException();
-            EmergencyData emergency = repository.findEmergency(emergencyId).orElseThrow(ResourceNotFoundException::new);
+            EmergencyDetailData emergency = repository.findEmergencyDetail(emergencyId)
+                    .orElseThrow(ResourceNotFoundException::new);
             UUID ownerUserId = repository.findEmergencyOwner(emergencyId).orElseThrow(ResourceNotFoundException::new);
             auditService.record(AuditEvent.success(identity.userId(), ownerUserId, "ALERT_VIEWED", "EMERGENCY", emergencyId,
                     null, null, "Administrative emergency detail viewed."));
-            return response(emergency);
+            return detailResponse(emergency);
         }
         UUID userId = requireEnabledUser(identity, false);
-        return repository.findOwnEmergency(emergencyId, userId).map(this::response).orElseThrow(ResourceNotFoundException::new);
+        return repository.findOwnEmergencyDetail(emergencyId, userId).map(this::detailResponse)
+                .orElseThrow(ResourceNotFoundException::new);
     }
 
     @Override
@@ -220,6 +225,14 @@ class EmergencyServiceImpl implements EmergencyService {
     private EmergencyResponse response(EmergencyData emergency) {
         return new EmergencyResponse(emergency.id(), emergency.status(), emergency.previousOperationalStatus(),
                 emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt());
+    }
+
+    private EmergencyDetailResponse detailResponse(EmergencyDetailData emergency) {
+        EmergencyLocationResponse location = emergency.latitude() == null ? null : new EmergencyLocationResponse(
+                emergency.latitude(), emergency.longitude(), emergency.accuracyMeters(), emergency.capturedAt(),
+                emergency.receivedAt());
+        return new EmergencyDetailResponse(emergency.id(), emergency.status(), emergency.previousOperationalStatus(),
+                emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt(), emergency.messageSnapshot(), location);
     }
 
     /** All lifecycle writers arrive here after locking the root emergency row. */

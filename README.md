@@ -160,11 +160,11 @@ $env:SPRING_DATASOURCE_URL = $env:SPRING_DATASOURCE_URL.Replace(
 4. Inicie el backend:
 
 ```powershell
-.\mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run '-Dspring-boot.run.arguments=--server.port=8081'
 ```
 
-La API queda en `http://localhost:8080/api/v1` y la salud técnica en
-`http://localhost:8080/actuator/health`.
+La API queda en `http://localhost:8081/api/v1` y la salud técnica en
+`http://localhost:8081/actuator/health`.
 
 `JWT_SECRET` debe tener al menos 32 bytes. Cambiarlo invalida los access tokens
 emitidos anteriormente. Para OTP por correo, el nombre correcto del remitente
@@ -223,8 +223,8 @@ incluye ni inicia servicios de Base de Datos.
 docker compose up --build
 ```
 
-La salud técnica está disponible en `http://localhost:8080/actuator/health`.
-El healthcheck de Compose comprueba esa ruta. La imagen falla antes de arrancar
+La salud técnica desde el host está disponible en `http://localhost:8081/actuator/health`.
+El healthcheck de Compose la comprueba internamente en `http://localhost:8080/actuator/health`. La imagen falla antes de arrancar
 si falta una variable obligatoria o si el usuario JDBC no es
 `alertamujer_app`.
 
@@ -327,11 +327,11 @@ una interacción con logs; si no se envía, el backend genera uno.
 
 | Cliente | URL base REST |
 | --- | --- |
-| Web en el mismo equipo | `http://localhost:8080/api/v1` |
-| Emulador Android | `http://10.0.2.2:8080/api/v1` |
-| Teléfono físico | `http://<IP-LAN-DEL-EQUIPO>:8080/api/v1` |
+| Web en el mismo equipo | `http://localhost:8081/api/v1` |
+| Emulador Android | `http://10.0.2.2:8081/api/v1` |
+| Teléfono físico | `http://<IP-LAN-DEL-EQUIPO>:8081/api/v1` |
 
-Para tiempo real, el endpoint es `ws://<host>:8080/ws`. El cliente STOMP usa
+Para tiempo real, el endpoint es `ws://<host>:8081/ws`. El cliente STOMP usa
 `/app/emergencies/{emergencyId}/messages` para enviar mensajes y se suscribe a
 `/topic/emergencies/{emergencyId}` para mensajes y cambios de estado ya
 confirmados.
