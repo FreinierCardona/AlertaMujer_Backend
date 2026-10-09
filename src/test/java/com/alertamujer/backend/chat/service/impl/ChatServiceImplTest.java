@@ -54,11 +54,13 @@ class ChatServiceImplTest {
                 .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "ACTIVE")));
         when(repository.findByClientMessageId(emergencyId, clientMessageId)).thenReturn(Optional.empty());
         when(repository.insert(eq(emergencyId), eq(owner.userId()), eq(clientMessageId), eq("Help me"), eq(now)))
-                .thenReturn(new ChatMessageData(41L, clientMessageId, "Help me", now));
+                .thenReturn(new ChatMessageData(41L, clientMessageId, owner.userId(), "USER", "Help me", now));
 
         var message = service.send(owner, emergencyId, new ChatMessageInput(clientMessageId, "  Help me  "));
 
         assertThat(message.messageId()).isEqualTo(41L);
+        assertThat(message.senderUserId()).isEqualTo(owner.userId());
+        assertThat(message.senderRole()).isEqualTo("USER");
         assertThat(message.content()).isEqualTo("Help me");
         verify(events).publishEvent(new EmergencyMessageCreatedEvent(emergencyId, message));
     }
@@ -66,7 +68,7 @@ class ChatServiceImplTest {
     @Test
     void recoversThePersistedMessageWithoutAnotherInsertOrBusinessEvent() {
         UUID clientMessageId = UUID.randomUUID();
-        ChatMessageData persisted = new ChatMessageData(41L, clientMessageId, "Already saved", now);
+        ChatMessageData persisted = new ChatMessageData(41L, clientMessageId, owner.userId(), "USER", "Already saved", now);
         when(repository.findAuthorizedEmergency(emergencyId, owner.userId(), "USER", true))
                 .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "ACTIVE")));
         when(repository.findByClientMessageId(emergencyId, clientMessageId)).thenReturn(Optional.of(persisted));

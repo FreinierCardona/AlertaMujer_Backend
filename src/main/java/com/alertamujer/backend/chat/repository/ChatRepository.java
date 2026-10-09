@@ -28,27 +28,43 @@ public class ChatRepository {
 
     public Optional<ChatMessageData> findByClientMessageId(UUID emergencyId, UUID clientMessageId) {
         List<ChatMessageData> rows = jdbc.query("""
-                select chat_message_id, client_message_id, content, sent_at
-                  from emergency.emergency_chat_messages
-                 where emergency_id = ? and client_message_id = ?
+                select message.chat_message_id, message.client_message_id, message.sender_user_id,
+                       sender.role, message.content, message.sent_at
+                  from emergency.emergency_chat_messages message
+                  join identity.users sender on sender.user_id = message.sender_user_id
+                 where message.emergency_id = ? and message.client_message_id = ?
                 """, messageMapper(), emergencyId, clientMessageId);
         return rows.stream().findFirst();
     }
 
     public ChatMessageData insert(UUID emergencyId, UUID senderUserId, UUID clientMessageId, String content, Instant sentAt) {
         return jdbc.queryForObject("""
-                insert into emergency.emergency_chat_messages (client_message_id, emergency_id, sender_user_id, content, sent_at)
-                values (?, ?, ?, ?, ?)
-                returning chat_message_id, client_message_id, content, sent_at
+                with inserted as (
+                  insert into emergency.emergency_chat_messages (
+                    client_message_id,
+                    emergency_id,
+                    sender_user_id,
+                    content,
+                    sent_at
+                  )
+                  values (?, ?, ?, ?, ?)
+                  returning chat_message_id, client_message_id, sender_user_id, content, sent_at
+                )
+                select message.chat_message_id, message.client_message_id, message.sender_user_id,
+                       sender.role, message.content, message.sent_at
+                  from inserted message
+                  join identity.users sender on sender.user_id = message.sender_user_id
                 """, messageMapper(), clientMessageId, emergencyId, senderUserId, content, Timestamp.from(sentAt));
     }
 
     public List<ChatMessageData> findAfter(UUID emergencyId, long after, int size) {
         return jdbc.query("""
-                select chat_message_id, client_message_id, content, sent_at
-                  from emergency.emergency_chat_messages
-                 where emergency_id = ? and chat_message_id > ?
-                 order by chat_message_id
+                select message.chat_message_id, message.client_message_id, message.sender_user_id,
+                       sender.role, message.content, message.sent_at
+                  from emergency.emergency_chat_messages message
+                  join identity.users sender on sender.user_id = message.sender_user_id
+                 where message.emergency_id = ? and message.chat_message_id > ?
+                 order by message.chat_message_id
                  limit ?
                 """, messageMapper(), emergencyId, after, size);
     }
@@ -58,10 +74,11 @@ public class ChatRepository {
     }
 
     private static org.springframework.jdbc.core.RowMapper<ChatMessageData> messageMapper() {
-        return (rs, row) -> new ChatMessageData(rs.getLong(1), rs.getObject(2, UUID.class), rs.getString(3),
-                rs.getTimestamp(4).toInstant());
+        return (rs, row) -> new ChatMessageData(rs.getLong(1), rs.getObject(2, UUID.class),
+                rs.getObject(3, UUID.class), rs.getString(4), rs.getString(5), rs.getTimestamp(6).toInstant());
     }
 
     public record EmergencyData(UUID id, String status) { }
-    public record ChatMessageData(long id, UUID clientMessageId, String content, Instant sentAt) { }
+    public record ChatMessageData(long id, UUID clientMessageId, UUID senderUserId,
+            String senderRole, String content, Instant sentAt) { }
 }
