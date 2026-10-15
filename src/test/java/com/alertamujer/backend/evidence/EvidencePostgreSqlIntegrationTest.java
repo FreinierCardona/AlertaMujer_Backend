@@ -65,7 +65,7 @@ class EvidencePostgreSqlIntegrationTest {
                 String reference = jdbc.queryForObject("select file_reference from emergency.emergency_evidences where evidence_id = ?",
                         String.class, response.evidenceId());
                 assertThat(response.mimeType()).isEqualTo("image/webp");
-                assertThat(response.sizeBytes()).isBetween(1, 1_048_576);
+                assertThat(response.sizeBytes()).isBetween(1, 500_000);
                 assertThat(reference).matches("[0-9a-f-]{36}\\.webp");
                 assertThat(Files.exists(storage.resolve(reference))).isTrue();
                 assertThat(jdbc.queryForObject("select count(*) from emergency.emergency_evidences where emergency_id = ?", Integer.class,
@@ -82,8 +82,8 @@ class EvidencePostgreSqlIntegrationTest {
         BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
         image.setRGB(4, 4, Color.RED.getRGB());
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", output);
-        return new MockMultipartFile("file", "camera.png", "image/png", output.toByteArray());
+        assertThat(ImageIO.write(image, "webp", output)).isTrue();
+        return new MockMultipartFile("file", "camera.webp", "image/webp", output.toByteArray());
     }
 
     private static void deleteDirectory(Path directory) throws IOException {
