@@ -50,8 +50,11 @@ class PostgreSqlIntegrationTest {
                     select count(*)
                     from information_schema.schemata
                     where schema_name in ('configuration', 'identity', 'profile', 'contacts',
-                                          'emergency', 'notification', 'audit')
-                    """, Integer.class)).isEqualTo(7);
+                                          'emergency', 'audit')
+                    """, Integer.class)).isEqualTo(6);
+            assertThat(jdbc.queryForObject("select to_regclass('notification.user_device_tokens')", String.class)).isNull();
+            assertThat(jdbc.queryForObject("select to_regclass('notification.emergency_notification_attempts')", String.class))
+                    .isNull();
             assertThat(jdbc.queryForObject("select has_schema_privilege(current_user, 'identity', 'CREATE')", Boolean.class))
                     .isFalse();
             assertThat(jdbc.queryForObject(

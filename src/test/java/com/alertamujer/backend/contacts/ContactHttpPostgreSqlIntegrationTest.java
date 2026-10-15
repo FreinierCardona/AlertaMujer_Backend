@@ -21,13 +21,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** End-to-end HTTP proof for the Mobile contacts and device-token contract. */
+/** End-to-end HTTP proof for the authenticated contacts contract and retired token route. */
 class ContactHttpPostgreSqlIntegrationTest {
 
     private static final String PASSWORD = "SecurePass#2026";
 
     @Test
-    void exposesSafeRelationshipsAndExecutesTheContactAndDeviceTokenFlow() throws Exception {
+    void exposesSafeRelationshipsAndRejectsTheRetiredDeviceTokenRoute() throws Exception {
         String url = System.getenv("SPRING_DATASOURCE_URL");
         String username = System.getenv("SPRING_DATASOURCE_USERNAME");
         String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
@@ -50,7 +50,6 @@ class ContactHttpPostgreSqlIntegrationTest {
             String suffix = UUID.randomUUID().toString().substring(0, 8);
             String ownerUsername = "@owner" + suffix;
             String recipientUsername = "@recipient" + suffix;
-            String deviceToken = "fcm-http-contact-" + UUID.randomUUID();
             try {
                 insertUser(jdbc, encoder, owner, ownerUsername, "Owner", suffix, 1);
                 insertUser(jdbc, encoder, recipient, recipientUsername, "Recipient", suffix, 2);
@@ -89,10 +88,8 @@ class ContactHttpPostgreSqlIntegrationTest {
                 assertThat(accepted.path("status").asString()).isEqualTo("ACCEPTED");
                 assertThat(accepted.path("eligible").asBoolean()).isTrue();
 
-                String tokenBody = "{\"token\":\"" + deviceToken + "\",\"platform\":\"ANDROID\"}";
-                assertStatus(call(client, "POST", baseUrl + "/api/v1/me/device-tokens", ownerToken, tokenBody), 201);
-                assertStatus(call(client, "POST", baseUrl + "/api/v1/me/device-tokens", ownerToken, tokenBody), 200);
-                assertStatus(call(client, "POST", baseUrl + "/api/v1/me/device-tokens", recipientToken, tokenBody), 409);
+                assertStatus(call(client, "POST", baseUrl + "/api/v1/me/device-tokens", ownerToken,
+                        "{\"token\":\"retired-route\",\"platform\":\"ANDROID\"}"), 404);
             } finally {
                 jdbc.update("delete from identity.users where user_id in (?, ?)", owner, recipient);
             }

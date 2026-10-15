@@ -15,7 +15,6 @@ require_environment SPRING_DATASOURCE_USERNAME
 require_environment SPRING_DATASOURCE_PASSWORD
 require_environment JWT_SECRET
 require_environment CORS_ALLOWED_ORIGINS
-require_environment FCM_CREDENTIALS_PATH
 require_environment EVIDENCE_STORAGE_PATH
 
 if [ "$SPRING_DATASOURCE_USERNAME" != "alertamujer_app" ]; then
