@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
 import com.alertamujer.backend.emergency.dto.request.LocationInput;
+import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyDetailData;
@@ -28,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class EmergencyServiceImplTest {
 
@@ -62,6 +65,21 @@ class EmergencyServiceImplTest {
         verify(repository).insertInitialLocation(result.emergency().emergencyId(), input.latitude(), input.longitude(),
                 input.accuracyMeters(), input.capturedAt(), now);
         verify(repository).insertInitialHistory(result.emergency().emergencyId(), userId, now);
+    }
+
+    @Test
+    void sosPublishesOnlyTheExistingStatusUpdateAndNoPushWorkEvent() {
+        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        service = new EmergencyServiceImpl(repository, configuration(), Clock.fixed(now, ZoneOffset.UTC), events);
+        when(repository.hasEligibleContact(userId)).thenReturn(true);
+        when(repository.findOpenEmergency(userId, true)).thenReturn(Optional.empty());
+        when(repository.findValidEmergencyMessage(userId)).thenReturn(Optional.empty());
+        when(repository.insertActiveEmergency(any(), eq(userId), eq("System SOS"), eq(now))).thenReturn(true);
+
+        var result = service.createOrRecover(identity, input(null));
+
+        verify(events).publishEvent(new EmergencyStatusChangedEvent(result.emergency().emergencyId(), "ACTIVE", now));
+        verifyNoMoreInteractions(events);
     }
 
     @Test
