@@ -18,7 +18,7 @@ actualiza o elimina objetos de base de datos.
 | Ejecutar contra PostgreSQL local | [Ejecución local](#ejecución-local) |
 | Iniciar la imagen | [Docker](#docker) |
 | Conectar el frontend | [Integración con frontend](#integración-con-frontend) |
-| Configurar OTP por correo o FCM | [Servicios externos](#servicios-externos) |
+| Configurar OTP por correo | [Servicios externos](#servicios-externos) |
 | Validar una entrega | [Pruebas y validación](#pruebas-y-validación) |
 
 La especificación funcional y los contratos OpenAPI viven en la documentación
@@ -71,15 +71,6 @@ src/main/java/com/alertamujer/
     │   ├── service/impl/
     │   ├── repository/
     │   └── model/
-    ├── notification/
-    │   ├── controller/
-    │   ├── dto/request/
-    │   ├── dto/response/
-    │   ├── service/
-    │   ├── service/impl/
-    │   ├── repository/
-    │   ├── model/
-    │   └── fcm/
     ├── evidence/
     │   ├── controller/
     │   ├── dto/request/
@@ -114,7 +105,6 @@ src/main/java/com/alertamujer/
 | `backend/identity` | `identity.registration_requests`, `users`, `user_credentials`, `user_verification_codes`, `user_sessions`; `profile.user_emergency_settings`. |
 | `backend/contacts` | `contacts.emergency_contacts`. |
 | `backend/emergency` | `emergency.emergencies`, `emergency_locations`, `emergency_status_history`. |
-| `backend/notification` | `notification.user_device_tokens`, `emergency.emergency_notification_attempts`. |
 | `backend/evidence` | `emergency.emergency_evidences`; el archivo queda fuera de PostgreSQL. |
 | `backend/chat` | `emergency.emergency_chat_messages`. |
 | `backend/administration` | Consultas autorizadas sobre `identity`, `emergency` y `audit.audit_logs`; no posee tablas propias. |
@@ -197,7 +187,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-integration
 
 El script lee solamente las tres variables de datasource de `.env`, adapta
 `host.docker.internal` a `127.0.0.1` para Windows y usa un JWT efímero de
-prueba. No modifica `.env`, no ejecuta Liquibase ni carga secretos SMTP, FCM o
+prueba. No modifica `.env`, no ejecuta Liquibase ni carga secretos SMTP o
 de almacenamiento. Antes de entregar cambios, ejecute también:
 
 ```powershell
@@ -266,7 +256,7 @@ service / service.impl
      │  autorización, reglas y transacciones
      ├───────────────────┬───────────────────┐
      ▼                   ▼                   ▼
-repository          SMTP / FCM / WS      almacenamiento
+repository          SMTP / WS            almacenamiento
 PostgreSQL                               de evidencias
 ```
 
@@ -289,7 +279,6 @@ Respete estos límites al ampliar el producto:
 | `contacts` | Directorio, invitaciones y contactos de emergencia. |
 | `emergency` | SOS, recuperación de emergencia abierta, ubicaciones, heartbeat y cierre. |
 | `chat` | Historial de mensajes y eventos STOMP por emergencia. |
-| `notification` | Tokens de dispositivo, intentos de aviso y cliente FCM. |
 | `evidence` | Metadatos PostgreSQL y contenido privado en disco. |
 | `administration` | Dashboard, usuarios, atención de emergencias y auditoría. |
 | `shared` | Seguridad, errores, configuración, auditoría y observabilidad. |
@@ -308,7 +297,6 @@ para cuerpos, restricciones y códigos HTTP; este resumen sirve para ubicar las
 | Emergencias | `/emergencies`, `active`, `heartbeats`, `locations`, `finish`, `/me/emergencies` | JWT y pertenencia a la emergencia. |
 | Chat | `/emergencies/{emergencyId}/messages` | JWT y autorización sobre la emergencia. |
 | Evidencias | rutas de evidencia bajo emergencia y `/evidences/{evidenceId}/content` | JWT y autorización. |
-| Dispositivos | `POST /me/device-tokens` | JWT. |
 | Administración | `/admin/**` | Rol `ENTITY_ADMIN`. |
 
 En rutas protegidas, el frontend debe enviar:
@@ -371,17 +359,6 @@ aplicación tras activar la verificación en dos pasos. No se necesita dominio o
 servidor propio. El email de recuperación responde de forma genérica aunque
 no exista la cuenta, para evitar revelar identidades registradas.
 
-### Firebase Cloud Messaging
-
-FCM se integra mediante HTTP v1 y un JSON de cuenta de servicio. El token real
-del dispositivo se registra con `POST /me/device-tokens`; nunca debe ir a Git,
-logs o documentación. El Compose monta la credencial como solo lectura en
-`/run/secrets/alertamujer-fcm.json`.
-
-Un estado `SENT_TO_FCM` o `FCM_ACCEPTED` significa que Firebase aceptó el
-mensaje, no que la persona lo leyó. La validación completa requiere un token
-de un dispositivo real y verificar la notificación visible.
-
 ### Evidencias
 
 Los metadatos se guardan en PostgreSQL y los binarios en
@@ -399,8 +376,7 @@ transacción. Retire la variable al terminar.
 
 ## Notas de seguridad y contribución
 
-- No registre `.env`, contraseñas de aplicación, JWT, tokens FCM, tokens de
-  sesión ni el JSON de Firebase.
+- No registre `.env`, contraseñas de aplicación, JWT ni tokens de sesión.
 - Use siempre `alertamujer_app`; no conecte como propietario, superusuario o
   usuario de migración.
 - Los códigos OTP permanecen protegidos; no se imprimen ni se exponen por API.

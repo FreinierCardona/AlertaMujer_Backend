@@ -5,7 +5,6 @@ import com.alertamujer.backend.emergency.dto.request.LocationInput;
 import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse;
 import com.alertamujer.backend.emergency.dto.response.EmergencyLocationResponse;
 import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
-import com.alertamujer.backend.emergency.event.EmergencyCreatedEvent;
 import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository;
 import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
@@ -86,7 +85,6 @@ class EmergencyServiceImpl implements EmergencyService {
                 input.capturedAt(), now);
         repository.insertInitialHistory(emergencyId, userId, now);
         eventPublisher.publishEvent(new EmergencyStatusChangedEvent(emergencyId, "ACTIVE", now));
-        eventPublisher.publishEvent(new EmergencyCreatedEvent(emergencyId, message, input.latitude(), input.longitude()));
         return new CreationResult(new EmergencyResponse(emergencyId, "ACTIVE", null, now, null, null), true);
     }
 
