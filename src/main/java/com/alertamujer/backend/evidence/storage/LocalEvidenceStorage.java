@@ -2,10 +2,6 @@ package com.alertamujer.backend.evidence.storage;
 
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -13,16 +9,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,13 +22,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Converts supported camera image uploads to bounded WebP files below the private configured directory. */
+/** Validates and normalizes transferred WebP evidence below the private configured directory. */
 @Component
 class LocalEvidenceStorage implements EvidenceStorage {
-    static final long MAX_INPUT_BYTES = 10L * 1_024 * 1_024;
-    private static final long MAX_PIXELS = 24_000_000L;
+    static final int MAX_WEBP_BYTES = 500_000;
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalEvidenceStorage.class);
-    private static final Set<String> ACCEPTED_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private final String storagePath;
     private final int maxFinalBytes;
 
@@ -47,21 +37,13 @@ class LocalEvidenceStorage implements EvidenceStorage {
 
     LocalEvidenceStorage(String storagePath, int maxFinalBytes) {
         this.storagePath = storagePath;
-        this.maxFinalBytes = maxFinalBytes;
+        this.maxFinalBytes = Math.min(maxFinalBytes, MAX_WEBP_BYTES);
     }
 
     @Override
     public StoredEvidenceFile store(MultipartFile source) throws IOException {
-        validateSource(source);
-        BufferedImage image;
-        try (InputStream input = source.getInputStream()) {
-            image = ImageIO.read(input);
-        }
-        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0
-                || (long) image.getWidth() * image.getHeight() > MAX_PIXELS) {
-            throw new RuleViolationException();
-        }
-        byte[] webp = encodeWithinLimit(image);
+        byte[] webp = source == null ? null : source.getBytes();
+        validateSource(source, webp);
         Path root = configuredRoot();
         Files.createDirectories(root);
         String reference = UUID.randomUUID() + ".webp";
@@ -131,64 +113,34 @@ class LocalEvidenceStorage implements EvidenceStorage {
         }
     }
 
-    private void validateSource(MultipartFile source) {
-        if (source == null || source.isEmpty() || source.getSize() > MAX_INPUT_BYTES
-                || source.getContentType() == null || !ACCEPTED_TYPES.contains(source.getContentType().toLowerCase())) {
+    private void validateSource(MultipartFile source, byte[] webp) {
+        if (source == null || source.isEmpty() || webp == null || webp.length > maxFinalBytes
+                || source.getContentType() == null || !"image/webp".equalsIgnoreCase(source.getContentType().trim())
+                || !isWebpContainer(webp)) {
             throw new RuleViolationException();
         }
     }
 
-    private byte[] encodeWithinLimit(BufferedImage original) throws IOException {
-        for (double scale : new double[] {1.0, 0.8, 0.64, 0.5, 0.4, 0.3, 0.2}) {
-            BufferedImage image = scale == 1.0 ? original : resized(original, scale);
-            for (float quality : new float[] {0.90f, 0.80f, 0.70f, 0.60f, 0.50f, 0.40f, 0.30f, 0.20f, 0.10f}) {
-                byte[] encoded = writeWebp(image, quality);
-                if (encoded.length <= maxFinalBytes) return encoded;
-            }
+    private boolean isWebpContainer(byte[] bytes) {
+        if (bytes.length < 20 || bytes[0] != 'R' || bytes[1] != 'I' || bytes[2] != 'F' || bytes[3] != 'F'
+                || bytes[8] != 'W' || bytes[9] != 'E' || bytes[10] != 'B' || bytes[11] != 'P') return false;
+        long declaredRiffSize = Integer.toUnsignedLong((bytes[4] & 0xff)
+                | ((bytes[5] & 0xff) << 8) | ((bytes[6] & 0xff) << 16) | ((bytes[7] & 0xff) << 24));
+        if (declaredRiffSize != bytes.length - 8L) return false;
+        boolean imageChunkFound = false;
+        long offset = 12;
+        while (offset + 8 <= bytes.length) {
+            int start = (int) offset;
+            byte[] chunkType = Arrays.copyOfRange(bytes, start, start + 4);
+            long chunkSize = Integer.toUnsignedLong((bytes[start + 4] & 0xff)
+                    | ((bytes[start + 5] & 0xff) << 8) | ((bytes[start + 6] & 0xff) << 16)
+                    | ((bytes[start + 7] & 0xff) << 24));
+            offset += 8 + chunkSize + (chunkSize & 1);
+            if (offset > bytes.length) return false;
+            imageChunkFound |= Arrays.equals(chunkType, new byte[] {'V', 'P', '8', ' '})
+                    || Arrays.equals(chunkType, new byte[] {'V', 'P', '8', 'L'});
         }
-        throw new RuleViolationException();
-    }
-
-    private byte[] writeWebp(BufferedImage image, float quality) throws IOException {
-        Iterator<ImageWriter> writers = ImageIO.getImageWritersByMIMEType("image/webp");
-        if (!writers.hasNext()) throw new IOException("WebP writer unavailable");
-        ImageWriter writer = writers.next();
-        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream(); ImageOutputStream output = ImageIO.createImageOutputStream(bytes)) {
-            ImageWriteParam parameters = writer.getDefaultWriteParam();
-            if (parameters.canWriteCompressed()) {
-                parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                String[] compressionTypes = parameters.getCompressionTypes();
-                if (compressionTypes != null) {
-                    for (String compressionType : compressionTypes) {
-                        if ("Lossy".equalsIgnoreCase(compressionType)) {
-                            parameters.setCompressionType(compressionType);
-                            break;
-                        }
-                    }
-                }
-                parameters.setCompressionQuality(quality);
-            }
-            writer.setOutput(output);
-            writer.write(null, new IIOImage(image, null, null), parameters);
-            output.flush();
-            return bytes.toByteArray();
-        } finally {
-            writer.dispose();
-        }
-    }
-
-    private BufferedImage resized(BufferedImage original, double scale) {
-        int width = Math.max(1, (int) Math.round(original.getWidth() * scale));
-        int height = Math.max(1, (int) Math.round(original.getHeight() * scale));
-        BufferedImage resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = resized.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            graphics.drawImage(original, 0, 0, width, height, null);
-        } finally {
-            graphics.dispose();
-        }
-        return resized;
+        return imageChunkFound && offset == bytes.length;
     }
 
     private Path configuredRoot() throws IOException {
