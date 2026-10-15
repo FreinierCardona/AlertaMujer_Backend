@@ -13,6 +13,7 @@ import com.alertamujer.backend.evidence.repository.EvidenceRepository;
 import com.alertamujer.backend.evidence.storage.EvidenceStorage;
 import com.alertamujer.backend.evidence.storage.StoredEvidenceFile;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.ForbiddenException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
 import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
@@ -54,6 +55,16 @@ class EvidenceServiceImplTest {
                 .thenReturn(Optional.of(new EvidenceRepository.EmergencyData(emergencyId, "OFFLINE")));
 
         assertThatThrownBy(() -> service.upload(identity, emergencyId, file())).isInstanceOf(StateConflictException.class);
+        verify(storage, never()).store(any());
+    }
+
+    @Test
+    void refusesAnAdministrativeIdentityBeforeLookingUpOrWritingEvidence() throws Exception {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+
+        assertThatThrownBy(() -> service.upload(administrator, emergencyId, file())).isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).lockOwnedEnabledEmergency(any(), any());
         verify(storage, never()).store(any());
     }
 
