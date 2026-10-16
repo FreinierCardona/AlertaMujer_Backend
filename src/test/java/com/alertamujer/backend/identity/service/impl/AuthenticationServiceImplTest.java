@@ -73,6 +73,32 @@ class AuthenticationServiceImplTest {
     }
 
     @Test
+    void loginOfBootstrapCompatibleAdministratorDoesNotRequireMobileTermsAcceptance() {
+        UserAccount administrator = new UserAccount(UUID.randomUUID(), "@admin", "Admin", "User",
+                "admin@example.com", "3000000001", "ENTITY_ADMIN", "ENABLED", AccountOrigin.ADMIN_CREATED, null);
+        when(repository.findUserByIdentifier("admin@example.com")).thenReturn(Optional.of(administrator));
+        when(repository.readPasswordHash(administrator.id())).thenReturn("stored-password-hash");
+        when(passwordEncoder.matches("SecurePass#2026", "stored-password-hash")).thenReturn(true);
+        when(repository.lockUser(administrator.id())).thenReturn(Optional.of(administrator));
+        when(passwordEncoder.encode(anyString())).thenReturn("stored-refresh-hash");
+        when(jwt.issue(any(), eq(now), eq(now.plusSeconds(300)))).thenReturn("access-token");
+
+        var response = service.login(new LoginInput("admin@example.com", "SecurePass#2026"));
+
+        verify(repository).createSession(any(), eq(administrator.id()), eq("stored-refresh-hash"), eq("ADMIN_WEB"),
+                eq(now.plusSeconds(600)), eq(now));
+        assertThat(response.termsPending()).isFalse();
+    }
+
+    @Test
+    void keepsTermsPendingForAnAdministratorCreatedMobileUser() {
+        UserAccount invitedUser = new UserAccount(UUID.randomUUID(), "@invited", "Invited", "User",
+                "invited@example.com", "3000000002", "USER", "ENABLED", AccountOrigin.ADMIN_CREATED, null);
+
+        assertThat(invitedUser.hasPendingTerms()).isTrue();
+    }
+
+    @Test
     void loginRejectsAnAccountDisabledWhileThePasswordWasBeingChecked() {
         UserAccount disabled = new UserAccount(user.id(), user.username(), user.firstNames(), user.lastNames(), user.email(),
                 user.phone(), user.role(), "DISABLED", user.accountOrigin(), user.acceptedTermsAt());

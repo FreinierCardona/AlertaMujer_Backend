@@ -276,7 +276,7 @@ public class IdentityAuthenticationRepository {
         }
 
         public boolean hasPendingTerms() {
-            return accountOrigin == AccountOrigin.ADMIN_CREATED && acceptedTermsAt == null;
+            return "USER".equals(role) && accountOrigin == AccountOrigin.ADMIN_CREATED && acceptedTermsAt == null;
         }
     }
 

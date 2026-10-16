@@ -43,7 +43,7 @@ public class AdministrationRepository {
         return jdbc.query("""
                 select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
                   from emergency.emergencies
-                 where (? is null or status = ?)
+                 where (cast(? as varchar) is null or status = cast(? as varchar))
                  order by started_at desc, emergency_id desc
                  limit ? offset ?
                 """, (rs, row) -> new EmergencyData(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
@@ -52,7 +52,7 @@ public class AdministrationRepository {
     }
 
     public long countEmergencies(String status) {
-        Long count = jdbc.queryForObject("select count(*) from emergency.emergencies where (? is null or status = ?)",
+        Long count = jdbc.queryForObject("select count(*) from emergency.emergencies where (cast(? as varchar) is null or status = cast(? as varchar))",
                 Long.class, status, status);
         return count == null ? 0 : count;
     }
