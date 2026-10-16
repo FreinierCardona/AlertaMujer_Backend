@@ -94,6 +94,7 @@ class AdministrationHttpPostgreSqlIntegrationTest {
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/dashboard", userToken, null), 403);
 
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/dashboard", adminToken, null), 200);
+                assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/emergencies", adminToken, null), 200);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/admin/emergencies?status=ACTIVE", adminToken, null), 200);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/emergencies/" + emergencyId, adminToken, null), 200);
                 assertStatus(call(client, "GET", baseUrl + "/api/v1/emergencies/" + emergencyId + "/evidences", adminToken, null), 200);
