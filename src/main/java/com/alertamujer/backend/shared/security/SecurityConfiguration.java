@@ -47,6 +47,13 @@ public class SecurityConfiguration {
                                 "/api/v1/registration-requests/*/verification-codes").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/registration-requests/*/verification-codes/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v2/registration-requests").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v2/registration-requests/*/verification-codes").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v2/registration-requests/*/verification-codes/verify").permitAll()
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/v2/registration-requests/*/credentials").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST,
@@ -87,7 +94,8 @@ public class SecurityConfiguration {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "X-Request-Id", "X-Registration-Proof"));
         configuration.setExposedHeaders(List.of("X-Request-Id"));
         configuration.setMaxAge(3600L);
 

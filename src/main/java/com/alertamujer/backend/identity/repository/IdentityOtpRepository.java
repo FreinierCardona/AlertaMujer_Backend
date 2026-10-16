@@ -37,7 +37,9 @@ public class IdentityOtpRepository {
                        status,
                        expires_at,
                        account_origin,
-                       accepted_terms_at
+                       accepted_terms_at,
+                       flow_version,
+                       registration_stage
                   from identity.registration_requests
                  where registration_request_id = ?
                  for update
@@ -52,8 +54,83 @@ public class IdentityOtpRepository {
                         rs.getString(7),
                         instant(rs.getTimestamp(8)),
                         AccountOrigin.valueOf(rs.getString(9)),
-                        instant(rs.getTimestamp(10))),
+                        instant(rs.getTimestamp(10)),
+                        rs.getString(11),
+                        rs.getString(12)),
                 requestId);
+    }
+
+    public boolean existsPhoneFirstIdentityConflict(String username, String phone) {
+        Boolean result = jdbc.queryForObject("""
+                select exists (
+                           select 1 from identity.users where username = ? or phone = ?
+                       ) or exists (
+                           select 1 from identity.registration_requests
+                            where status = 'PENDING' and (username = ? or phone = ?)
+                       )
+                """, Boolean.class, username, phone, username, phone);
+        return Boolean.TRUE.equals(result);
+    }
+
+    public void insertPhoneFirstRegistrationRequest(
+            UUID requestId,
+            String username,
+            String firstNames,
+            String lastNames,
+            String phone,
+            String flowSecretHash,
+            Instant expiresAt,
+            Instant now) {
+        jdbc.update("""
+                insert into identity.registration_requests (
+                    registration_request_id, username, first_names, last_names, email, phone, password_hash,
+                    status, expires_at, created_at, updated_at, account_origin, accepted_terms_at,
+                    flow_version, registration_stage, flow_secret_hash
+                ) values (?, ?, ?, ?, null, ?, null, 'PENDING', ?, ?, ?, 'SELF_REGISTERED', null,
+                          'V2', 'PHONE_PENDING', ?)
+                """,
+                requestId, username, firstNames, lastNames, phone, Timestamp.from(expiresAt), Timestamp.from(now),
+                Timestamp.from(now), flowSecretHash);
+    }
+
+    public String readRegistrationFlowProofHash(UUID requestId) {
+        return jdbc.queryForObject("select identity.get_registration_flow_proof_hash(?)", String.class, requestId);
+    }
+
+    public void markPhoneVerified(UUID requestId, Instant now) {
+        jdbc.update("""
+                update identity.registration_requests
+                   set registration_stage = 'PHONE_VERIFIED', updated_at = ?
+                 where registration_request_id = ?
+                   and flow_version = 'V2'
+                   and status = 'PENDING'
+                   and registration_stage = 'PHONE_PENDING'
+                """, Timestamp.from(now), requestId);
+    }
+
+    public boolean existsEmailConflictExceptRequest(UUID requestId, String email) {
+        Boolean result = jdbc.queryForObject("""
+                select exists (select 1 from identity.users where email = ?)
+                    or exists (
+                        select 1 from identity.registration_requests
+                         where status = 'PENDING'
+                           and registration_request_id <> ?
+                           and email = ?
+                    )
+                """, Boolean.class, email, requestId, email);
+        return Boolean.TRUE.equals(result);
+    }
+
+    public void setV2Credentials(UUID requestId, String email, String passwordHash, Instant acceptedTermsAt) {
+        jdbc.update("""
+                update identity.registration_requests
+                   set email = ?, password_hash = ?, accepted_terms_at = ?, registration_stage = 'EMAIL_PENDING',
+                       updated_at = ?
+                 where registration_request_id = ?
+                   and flow_version = 'V2'
+                   and status = 'PENDING'
+                   and registration_stage = 'PHONE_VERIFIED'
+                """, email, passwordHash, Timestamp.from(acceptedTermsAt), Timestamp.from(acceptedTermsAt), requestId);
     }
 
     public Optional<UserData> lockUserByEmail(String email) {
@@ -265,6 +342,7 @@ public class IdentityOtpRepository {
         jdbc.update("""
                 update identity.registration_requests
                    set status = 'COMPLETED',
+                       registration_stage = case when flow_version = 'V2' then 'COMPLETED' else registration_stage end,
                        updated_at = ?
                  where registration_request_id = ?
                    and status = 'PENDING'
@@ -277,6 +355,7 @@ public class IdentityOtpRepository {
         jdbc.update("""
                 update identity.registration_requests
                    set status = 'EXPIRED',
+                       registration_stage = case when flow_version = 'V2' then 'EXPIRED' else registration_stage end,
                        updated_at = ?
                  where registration_request_id = ?
                    and status = 'PENDING'
@@ -468,7 +547,25 @@ public class IdentityOtpRepository {
             String status,
             Instant expiresAt,
             AccountOrigin accountOrigin,
-            Instant acceptedTermsAt) {
+            Instant acceptedTermsAt,
+            String flowVersion,
+            String registrationStage) {
+
+        /** Preserves existing v1 unit fixtures while v2 data carries explicit stages. */
+        public RegistrationRequestData(
+                UUID id,
+                String username,
+                String firstNames,
+                String lastNames,
+                String email,
+                String phone,
+                String status,
+                Instant expiresAt,
+                AccountOrigin accountOrigin,
+                Instant acceptedTermsAt) {
+            this(id, username, firstNames, lastNames, email, phone, status, expiresAt, accountOrigin,
+                    acceptedTermsAt, "V1", "EMAIL_PENDING");
+        }
     }
 
     public record VerificationCodeData(

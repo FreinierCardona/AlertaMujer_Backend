@@ -23,7 +23,7 @@ class SecurityConfigurationCorsTest {
                 configuration.getAllowedOrigins());
         assertEquals(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
                 configuration.getAllowedMethods());
-        assertEquals(List.of("Authorization", "Content-Type", "X-Request-Id"),
+        assertEquals(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Registration-Proof"),
                 configuration.getAllowedHeaders());
         assertEquals(List.of("X-Request-Id"), configuration.getExposedHeaders());
     }
