@@ -55,6 +55,9 @@ class OtpServiceImpl implements OtpService {
     @Override
     @Transactional
     public OtpIssuedResponse issueRegistrationCode(UUID registrationRequestId, OtpChannel channel) {
+        if (channel == OtpChannel.PHONE_SIMULATOR) {
+            throw new RuleViolationException();
+        }
         RegistrationRequestData request = repository.lockRegistrationRequest(registrationRequestId)
                 .orElseThrow(ResourceNotFoundException::new);
         Instant now = clock.instant();
@@ -183,6 +186,7 @@ class OtpServiceImpl implements OtpService {
         return switch (channel) {
             case EMAIL -> OtpPurpose.EMAIL_VERIFICATION;
             case SMS -> OtpPurpose.PHONE_VERIFICATION;
+            case PHONE_SIMULATOR -> throw new RuleViolationException();
         };
     }
 
