@@ -37,6 +37,17 @@ class PhoneFirstRegistrationControllerTest {
     }
 
     @Test
+    void exposesTheDuplicateFieldWithASpanishMessage() throws Exception {
+        when(service.start(any())).thenThrow(new com.alertamujer.backend.shared.errors.RegistrationConflictException("phone"));
+        mockMvc.perform(post("/api/v2/registration-requests").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"@ana_user\",\"firstNames\":\"Ana\",\"lastNames\":\"Perez\",\"phone\":\"3001234567\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_DUPLICATE"))
+                .andExpect(jsonPath("$.fields[0].field").value("phone"))
+                .andExpect(jsonPath("$.fields[0].message").value("Este teléfono ya está registrado o tiene una solicitud pendiente."));
+    }
+
+    @Test
     void startsWithPersonalDataAndReturnsTheOpaqueProofOnlyInTheInitialResponse() throws Exception {
         UUID requestId = UUID.randomUUID();
         when(service.start(any())).thenReturn(new PhoneFirstRegistrationResponse(

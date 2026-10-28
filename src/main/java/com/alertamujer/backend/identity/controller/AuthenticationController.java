@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for the contract's login, renewal, logout, and password routes. */
+/** Adaptador HTTP de las rutas del contrato para inicio, renovación y cierre de sesión, y gestión de contraseñas. */
 @RestController
 @RequestMapping("/api/v1")
 public class AuthenticationController {

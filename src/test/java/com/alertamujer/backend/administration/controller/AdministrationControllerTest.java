@@ -39,10 +39,11 @@ class AdministrationControllerTest {
 
     @Test
     void returnsTheMinimalDashboardContract() throws Exception {
-        org.mockito.Mockito.when(service.dashboard(any())).thenReturn(new DashboardResponse(2, 3, 1));
+        org.mockito.Mockito.when(service.dashboard(any())).thenReturn(new DashboardResponse(2, 3, 1, 4));
         mockMvc.perform(get("/api/v1/admin/dashboard"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.activeCount").value(2))
-                .andExpect(jsonPath("$.inProgressCount").value(3)).andExpect(jsonPath("$.offlineCount").value(1));
+                .andExpect(jsonPath("$.inProgressCount").value(3)).andExpect(jsonPath("$.offlineCount").value(1))
+                .andExpect(jsonPath("$.finalizedCount").value(4));
         verify(service).dashboard(any());
     }
 

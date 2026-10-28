@@ -1,5 +1,6 @@
 package com.alertamujer.backend.emergency.repository;
 
+import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse.OwnerIdentity;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -9,7 +10,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SQL for the emergency tables already owned and migrated by the Database project. */
+/** SQL de las tablas de emergencia cuya definición y migración corresponden al proyecto Database. */
 @Repository
 public class EmergencyRepository {
 
@@ -94,6 +95,16 @@ public class EmergencyRepository {
         return findEmergencyDetail("where emergency.emergency_id = ?", emergencyId);
     }
 
+    public Optional<OwnerIdentity> findOwnerIdentity(UUID emergencyId) {
+        return jdbc.query("""
+                select u.username, u.first_names, u.last_names, u.phone, u.email
+                  from emergency.emergencies e join identity.users u on u.user_id = e.user_id
+                 where e.emergency_id = ?
+                """, (rs, row) -> new OwnerIdentity(
+                        rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)), emergencyId)
+                .stream().findFirst();
+    }
+
     public Optional<UUID> findEmergencyOwner(UUID emergencyId) {
         List<UUID> owners = jdbc.query("select user_id from emergency.emergencies where emergency_id = ?",
                 (rs, row) -> rs.getObject(1, UUID.class), emergencyId);
@@ -109,8 +120,8 @@ public class EmergencyRepository {
     }
 
     /**
-     * Finds a short candidate batch only. The service locks and revalidates each
-     * row before changing it because a heartbeat may arrive after this query.
+     * Busca únicamente un lote pequeño de candidatos. El servicio bloquea y revalida cada fila antes de
+     * modificarla, pues puede recibirse una señal de actividad después de esta consulta.
      */
     public List<UUID> findTimedOutEmergencyIds(Instant cutoff, int limit) {
         return jdbc.query("""
@@ -281,7 +292,12 @@ public class EmergencyRepository {
 
     public record UserData(UUID id) { }
     public record EmergencyData(UUID id, String status, String previousOperationalStatus, Instant startedAt,
-            Instant lastHeartbeatAt, Instant finalizedAt) { }
+            Instant lastHeartbeatAt, Instant finalizedAt, String username, String displayName) {
+        public EmergencyData(UUID id, String status, String previousOperationalStatus, Instant startedAt,
+                Instant lastHeartbeatAt, Instant finalizedAt) {
+            this(id, status, previousOperationalStatus, startedAt, lastHeartbeatAt, finalizedAt, null, null);
+        }
+    }
     public record EmergencyDetailData(UUID id, String status, String previousOperationalStatus, Instant startedAt,
             Instant lastHeartbeatAt, Instant finalizedAt, String messageSnapshot, BigDecimal latitude, BigDecimal longitude,
             BigDecimal accuracyMeters, Instant capturedAt, Instant receivedAt) { }

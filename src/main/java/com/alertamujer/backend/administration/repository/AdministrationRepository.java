@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** Queries limited to the data needed for authorized administrative operation. */
+/** Consultas limitadas a los datos necesarios para las operaciones administrativas autorizadas. */
 @Repository
 public class AdministrationRepository {
     private final JdbcTemplate jdbc;
@@ -34,20 +34,22 @@ public class AdministrationRepository {
         return jdbc.queryForObject("""
                 select count(*) filter (where status = 'ACTIVE'),
                        count(*) filter (where status = 'IN_PROGRESS'),
-                       count(*) filter (where status = 'OFFLINE')
+                       count(*) filter (where status = 'OFFLINE'),
+                       count(*) filter (where status = 'FINALIZED')
                   from emergency.emergencies
-                """, (rs, row) -> new DashboardData(rs.getLong(1), rs.getLong(2), rs.getLong(3)));
+                """, (rs, row) -> new DashboardData(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4)));
     }
 
     public List<EmergencyData> findEmergencies(String status, int size, int offset) {
         return jdbc.query("""
-                select emergency_id, status, previous_operational_status, started_at, last_heartbeat_at, finalized_at
-                  from emergency.emergencies
+                select e.emergency_id, e.status, e.previous_operational_status, e.started_at, e.last_heartbeat_at, e.finalized_at,
+                       u.username, concat_ws(' ', u.first_names, u.last_names)
+                  from emergency.emergencies e join identity.users u on u.user_id = e.user_id
                  where (cast(? as varchar) is null or status = cast(? as varchar))
                  order by started_at desc, emergency_id desc
                  limit ? offset ?
                 """, (rs, row) -> new EmergencyData(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
-                instant(rs.getTimestamp(4)), instant(rs.getTimestamp(5)), instant(rs.getTimestamp(6))),
+                instant(rs.getTimestamp(4)), instant(rs.getTimestamp(5)), instant(rs.getTimestamp(6)), rs.getString(7), rs.getString(8)),
                 status, status, size, offset);
     }
 
@@ -117,7 +119,10 @@ public class AdministrationRepository {
                 """, (rs, row) -> rs.getObject(1, UUID.class), Timestamp.from(cutoff), limit);
     }
 
-    /** The eligibility predicate is repeated in the update to prevent a stale job selection from disabling a fresh login. */
+    /**
+ * La actualización repite la condición de elegibilidad para que una selección desactualizada de la
+ * tarea no deshabilite una cuenta que acaba de iniciar sesión.
+ */
     public boolean disableUserIfStillInactive(UUID userId, Instant cutoff, Instant now) {
         return jdbc.update("""
                 update identity.users
@@ -178,7 +183,7 @@ public class AdministrationRepository {
         return value == null ? null : value.toInstant();
     }
 
-    public record DashboardData(long activeCount, long inProgressCount, long offlineCount) { }
+    public record DashboardData(long activeCount, long inProgressCount, long offlineCount, long finalizedCount) { }
     public record ManagedUserData(UUID id, String role, String accountStatus, Instant disabledAt,
             Instant lastActivityAt, Instant lastLoginAt, Instant createdAt) { }
     public record ReplacementUserData(UUID id, String role, String accountStatus, Instant acceptedTermsAt) { }

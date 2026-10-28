@@ -3,7 +3,7 @@ package com.alertamujer.backend.shared.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Loads the release-versioned configuration exactly once during startup. */
+/** Carga una sola vez al iniciar la configuración versionada con la entrega. */
 @Configuration
 class SystemConfigurationStartupConfiguration {
 

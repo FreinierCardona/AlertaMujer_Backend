@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// Expone alertas y evidencias mediante consultas que comprueban la relación autorizada del contacto.
 @Service
 class ContactAlertServiceImpl implements ContactAlertService {
     private final ContactAlertRepository repository;
@@ -40,6 +41,7 @@ class ContactAlertServiceImpl implements ContactAlertService {
                 .toList(), page, size, repository.countAuthorizedAlerts(contactUserId));
     }
 
+    /** Incluye la última ubicación disponible y las evidencias visibles para el contacto. */
     @Override
     @Transactional(readOnly = true)
     public ContactAlertDetailResponse detail(AuthenticatedIdentity identity, UUID emergencyId) {
@@ -55,7 +57,7 @@ class ContactAlertServiceImpl implements ContactAlertService {
     @Transactional(readOnly = true)
     public List<EvidenceResponse> evidences(AuthenticatedIdentity identity, UUID emergencyId) {
         UUID contactUserId = requireEnabledUserRole(identity);
-        // An empty evidence list must still prove that the alert is authorized.
+        // Incluso una lista vacía exige comprobar primero la autorización sobre la alerta.
         repository.findAuthorizedAlertDetail(contactUserId, emergencyId).orElseThrow(ResourceNotFoundException::new);
         return evidence(contactUserId, emergencyId);
     }

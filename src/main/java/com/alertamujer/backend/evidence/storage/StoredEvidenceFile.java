@@ -1,4 +1,4 @@
 package com.alertamujer.backend.evidence.storage;
 
-/** Internal result of a successful local WebP conversion and move. */
+/** Resultado interno de una conversión y traslado local de WebP realizados correctamente. */
 public record StoredEvidenceFile(String reference, int sizeBytes) { }

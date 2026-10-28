@@ -31,7 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Coordinates permitted panel operations without duplicating SOS or identity lifecycle rules. */
+/** Coordina las operaciones permitidas del panel sin duplicar reglas del ciclo de vida de SOS o identidad. */
 @Service
 class AdministrationServiceImpl implements AdministrationService {
     private final AdministrationRepository repository;
@@ -67,7 +67,7 @@ class AdministrationServiceImpl implements AdministrationService {
         requireAdministrator(identity);
         var values = repository.dashboard();
         auditAlertAccess(identity.userId(), "DASHBOARD", identity.userId(), "Administrative dashboard viewed.");
-        return new DashboardResponse(values.activeCount(), values.inProgressCount(), values.offlineCount());
+        return new DashboardResponse(values.activeCount(), values.inProgressCount(), values.offlineCount(), values.finalizedCount());
     }
 
     @Override @Transactional
@@ -200,11 +200,11 @@ class AdministrationServiceImpl implements AdministrationService {
 
     private EmergencyResponse emergency(com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData value) {
         return new EmergencyResponse(value.id(), value.status(), value.previousOperationalStatus(), value.startedAt(),
-                value.lastHeartbeatAt(), value.finalizedAt());
+                value.lastHeartbeatAt(), value.finalizedAt(), value.username(), value.displayName());
     }
 
     private AuthenticatedUserResponse profile(UserProfileData user) {
         return new AuthenticatedUserResponse(user.id(), user.username(), user.firstNames(), user.lastNames(), user.email(),
-                user.phone(), user.role(), user.accountStatus());
+                user.phone(), user.role(), user.accountStatus(), "USER".equals(user.role()) && user.acceptedTermsAt() == null);
     }
 }

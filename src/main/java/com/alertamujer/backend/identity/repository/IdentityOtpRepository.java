@@ -13,8 +13,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 /**
- * Uses only the columns granted to alertamujer_app. OTP/password hashes are
- * retrieved by the narrowly scoped PostgreSQL functions, never table SELECT.
+ * Utiliza solo las columnas autorizadas para alertamujer_app. Los hashes OTP y de contraseñas se
+ * obtienen mediante funciones PostgreSQL de alcance restringido, nunca mediante SELECT sobre tablas.
  */
 @Repository
 public class IdentityOtpRepository {
@@ -25,7 +25,7 @@ public class IdentityOtpRepository {
         this.jdbc = jdbc;
     }
 
-    // Registration context lookup and locking.
+    // Consulta y bloqueo del contexto de registro.
     public Optional<RegistrationRequestData> lockRegistrationRequest(UUID requestId) {
         return single("""
                 select registration_request_id,
@@ -146,7 +146,7 @@ public class IdentityOtpRepository {
                 email);
     }
 
-    // OTP issuance and invalidation for registration or an existing account.
+    // Emisión e invalidación de OTP para un registro o una cuenta existente.
     public Optional<VerificationCodeData> lockLatestRegistrationCode(
             UUID requestId, OtpPurpose purpose, OtpChannel channel, String destination) {
         return lockLatestCode("registration_request_id = ?", requestId, purpose, channel, destination);
@@ -232,7 +232,7 @@ public class IdentityOtpRepository {
                 verificationCodeId);
     }
 
-    // OTP consumption and registration completion.
+    // Consumo de OTP y finalización del registro.
     public void recordFailedAttempt(UUID verificationCodeId, Instant now) {
         jdbc.update("""
                 update identity.user_verification_codes
@@ -366,7 +366,7 @@ public class IdentityOtpRepository {
                 Timestamp.from(now));
     }
 
-    // Scheduled cleanup; each statement selects a bounded, locked batch first.
+    // Limpieza programada; cada sentencia selecciona primero un lote limitado y bloqueado.
     public int deleteInvalidVerificationCodes(Instant now, int limit) {
         return jdbc.update("""
                 with candidates as (
@@ -551,7 +551,7 @@ public class IdentityOtpRepository {
             String flowVersion,
             String registrationStage) {
 
-        /** Preserves existing v1 unit fixtures while v2 data carries explicit stages. */
+        /** Conserva los datos de pruebas unitarias v1 existentes mientras los datos v2 incluyen etapas explícitas. */
         public RegistrationRequestData(
                 UUID id,
                 String username,

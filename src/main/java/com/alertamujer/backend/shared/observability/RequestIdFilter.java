@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Adds a safe correlation identifier to every HTTP request and response.
+ * Agrega un identificador seguro de correlación a cada solicitud y respuesta HTTP.
  */
 @Component
 public class RequestIdFilter extends OncePerRequestFilter {

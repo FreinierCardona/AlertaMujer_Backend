@@ -13,7 +13,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Verifies the signed access token and its live PostgreSQL session on every protected request. */
+/** Valida el JWT y consulta la sesión persistida para detectar revocaciones en cada solicitud autenticada. */
 @Component
 public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
@@ -48,9 +48,11 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
             if (role == null || (!"USER".equals(role) && !"ENTITY_ADMIN".equals(role))) {
                 throw new IllegalArgumentException("invalid role");
             }
+            // El cierre de sesión usa una validación específica para admitir cierres repetidos.
             AuthenticatedIdentity identity = isLogoutRequest(request)
                     ? authenticationService.validateLogoutSession(userId, sessionId, role)
                     : authenticationService.validateAccessSession(userId, sessionId, role);
+            // Mientras falte aceptar términos, solo se permiten las rutas de continuidad de sesión.
             if (identity.termsPending() && !isAllowedWhileTermsPending(request)) {
                 errorResponseWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN,
                         "FORBIDDEN", "Access is denied.");
@@ -61,6 +63,7 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
         } catch (JwtException | IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
             unauthorized(request, response);
+        // Limpia la identidad incluso si el procesamiento falla, pues el hilo puede atender otra solicitud.
         } finally {
             SecurityContextHolder.clearContext();
         }

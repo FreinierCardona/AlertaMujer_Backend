@@ -22,7 +22,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Uses the migrated application role to verify the HU-API-010 SQL/grants contract. */
+/** Usa el rol de aplicación migrado para verificar el contrato SQL y de permisos de HU-API-010. */
 class ProfilePostgreSqlIntegrationTest {
     @Test
     void updatesOnlyOwnStateConsumesContactOtpAcceptsTermsAndDeletesTheRoot() throws Exception {

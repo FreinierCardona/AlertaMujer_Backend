@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** JDBC access limited to the migrated emergency evidence metadata table. */
+/** Acceso JDBC limitado a la tabla migrada de metadatos de evidencias de emergencia. */
 @Repository
 public class EvidenceRepository {
     private final JdbcTemplate jdbc;

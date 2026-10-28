@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Own relationship, its safe counterpart presentation and Backend-authorized actions. */
+/** Relación propia, presentación segura de la contraparte y acciones autorizadas por el servidor. */
 public record ContactResponse(
         UUID contactId,
         String status,

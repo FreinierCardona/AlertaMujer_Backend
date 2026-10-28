@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Credentials accepted only after the simulated-phone verification succeeds. */
+/** Credenciales aceptadas solo después de completar la verificación telefónica simulada. */
 public record RegistrationCredentialsInput(
         @NotBlank @Email @Size(max = 254) String email,
         @NotBlank @Size(min = 12, max = 255)

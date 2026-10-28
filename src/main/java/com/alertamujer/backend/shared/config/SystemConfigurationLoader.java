@@ -3,9 +3,11 @@ package com.alertamujer.backend.shared.config;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+// Carga la única configuración operativa y rechaza valores obligatorios ausentes.
 @Component
 class SystemConfigurationLoader {
 
+    // Coincide con el identificador único permitido por la restricción de la tabla.
     private static final short SINGLETON_ID = 1;
 
     private final SystemConfigurationRepository repository;

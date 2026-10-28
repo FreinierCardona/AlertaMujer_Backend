@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for the authenticated, read-only contact emergency panel. */
+/** Adaptador HTTP del panel de emergencias para contactos autenticados, disponible solo para lectura. */
 @RestController
 @Validated
 @RequestMapping("/api/v1/me/contact-alerts")

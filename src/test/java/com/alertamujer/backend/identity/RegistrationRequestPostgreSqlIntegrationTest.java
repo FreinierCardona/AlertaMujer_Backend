@@ -8,6 +8,9 @@ import com.alertamujer.backend.identity.dto.request.AdminRegistrationRequestInpu
 import com.alertamujer.backend.identity.dto.request.RegistrationRequestInput;
 import com.alertamujer.backend.identity.dto.response.RegistrationRequestResponse;
 import com.alertamujer.backend.identity.service.RegistrationRequestService;
+import com.alertamujer.backend.identity.service.AuthenticationService;
+import com.alertamujer.backend.identity.dto.request.LoginInput;
+import com.alertamujer.backend.shared.errors.UnauthorizedException;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
@@ -19,13 +22,13 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Uses the application role against a supplied migrated database and removes
- * its random temporary requests before returning.
+ * Usa el rol de aplicación contra una base migrada proporcionada y elimina sus solicitudes temporales
+ * aleatorias antes de terminar.
  */
 class RegistrationRequestPostgreSqlIntegrationTest {
 
     @Test
-    void persistsOnlyTemporaryRequestsWithTheDatabaseLeastPrivilegeContract() {
+    void completesOnlyAdministrativeAccountsAndAllowsImmediateLogin() {
         String url = System.getenv("SPRING_DATASOURCE_URL");
         String username = System.getenv("SPRING_DATASOURCE_USERNAME");
         String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
@@ -64,28 +67,43 @@ class RegistrationRequestPostgreSqlIntegrationTest {
                         from identity.registration_requests where registration_request_id = ?
                         """, Boolean.class, publicRequest.registrationRequestId())).isTrue();
                 assertThat(jdbc.queryForObject("""
-                        select account_origin = 'ADMIN_CREATED' and accepted_terms_at is null and status = 'PENDING'
+                        select account_origin = 'ADMIN_CREATED' and accepted_terms_at is null and status = 'COMPLETED'
                         from identity.registration_requests where registration_request_id = ?
                         """, Boolean.class, adminRequest.registrationRequestId())).isTrue();
                 assertThat(jdbc.queryForObject(
                         "select count(*) from identity.users where username in (?, ?)", Integer.class,
-                        publicUsername, adminUsername)).isZero();
+                        publicUsername, adminUsername)).isEqualTo(1);
                 assertThat(jdbc.queryForObject("""
                         select count(*) from identity.user_credentials credentials
                         join identity.users users on users.user_id = credentials.user_id
                         where users.username in (?, ?)
-                        """, Integer.class, publicUsername, adminUsername)).isZero();
+                        """, Integer.class, publicUsername, adminUsername)).isEqualTo(1);
                 assertThat(jdbc.queryForObject("""
                         select count(*) from identity.user_sessions sessions
                         join identity.users users on users.user_id = sessions.user_id
                         where users.username in (?, ?)
                         """, Integer.class, publicUsername, adminUsername)).isZero();
+                assertThat(adminRequest.status()).isEqualTo("COMPLETED");
+                assertThat(jdbc.queryForObject("select account_status from identity.users where username = ?",
+                        String.class, adminUsername)).isEqualTo("ENABLED");
+                assertThat(jdbc.queryForObject("select count(*) from identity.user_verification_codes where registration_request_id = ?",
+                        Integer.class, adminRequest.registrationRequestId())).isZero();
+                AuthenticationService authentication = context.getBean(AuthenticationService.class);
+                var session = authentication.login(new LoginInput(adminUsername, "SecurePass#2026"));
+                assertThat(session.accessToken()).isNotBlank();
+                assertThat(session.user().role()).isEqualTo("USER");
+                assertThat(session.termsPending()).isTrue();
+                assertThat(authentication.login(new LoginInput("admin-" + numericSuffix + "@example.com", "SecurePass#2026"))
+                        .user().userId()).isEqualTo(session.user().userId());
+                assertThatThrownBy(() -> authentication.login(new LoginInput(publicUsername, "SecurePass#2026")))
+                        .isInstanceOf(UnauthorizedException.class);
                 UUID publicRequestId = publicRequest.registrationRequestId();
                 assertThatThrownBy(() -> jdbc.queryForObject("""
                         select password_hash from identity.registration_requests where registration_request_id = ?
                         """, String.class, publicRequestId))
                         .isInstanceOf(DataAccessException.class);
             } finally {
+                jdbc.update("delete from identity.users where username = ?", adminUsername);
                 if (publicRequest != null) {
                     jdbc.update("delete from identity.registration_requests where registration_request_id = ?",
                             publicRequest.registrationRequestId());

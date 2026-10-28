@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** REST endpoints owned by the emergency module. */
+/** Rutas REST a cargo del módulo de emergencias. */
 @RestController
 @RequestMapping("/api/v1/emergencies")
 public class EmergencyController {

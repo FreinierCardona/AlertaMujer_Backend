@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.alertamujer.backend.administration.service.AdministrationService;
 import com.alertamujer.backend.chat.dto.request.ChatMessageInput;
 import com.alertamujer.backend.chat.event.EmergencyMessageCreatedEvent;
 import com.alertamujer.backend.chat.repository.ChatRepository;
@@ -33,6 +34,7 @@ class ChatServiceImplTest {
     private ChatRepository repository;
     private ApplicationEventPublisher events;
     private AuditService audit;
+    private AdministrationService administration;
     private ChatServiceImpl service;
     private UUID emergencyId;
     private AuthenticatedIdentity owner;
@@ -42,7 +44,8 @@ class ChatServiceImplTest {
         repository = mock(ChatRepository.class);
         events = mock(ApplicationEventPublisher.class);
         audit = mock(AuditService.class);
-        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events, configuration((short) 500), audit);
+        administration = mock(AdministrationService.class);
+        service = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events, configuration((short) 500), audit, administration);
         emergencyId = UUID.randomUUID();
         owner = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
     }
@@ -63,6 +66,44 @@ class ChatServiceImplTest {
         assertThat(message.senderRole()).isEqualTo("USER");
         assertThat(message.content()).isEqualTo("Help me");
         verify(events).publishEvent(new EmergencyMessageCreatedEvent(emergencyId, message));
+        verify(administration, never()).startAttention(any(), any());
+    }
+
+    @Test
+    void administratorMessageStartsAttentionOnlyForANewActiveMessage() {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+        UUID clientId = UUID.randomUUID();
+        when(repository.findAuthorizedEmergency(emergencyId, administrator.userId(), "ENTITY_ADMIN", true))
+                .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "ACTIVE")));
+        when(repository.insert(emergencyId, administrator.userId(), clientId, "Hello", now))
+                .thenReturn(new ChatMessageData(42L, clientId, administrator.userId(), "ENTITY_ADMIN", "Hello", now));
+
+        service.send(administrator, emergencyId, new ChatMessageInput(clientId, "Hello"));
+        verify(administration).startAttention(administrator, emergencyId);
+    }
+
+    @Test
+    void administratorRetryDoesNotStartAttentionAgain() {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+        UUID clientId = UUID.randomUUID();
+        when(repository.findAuthorizedEmergency(emergencyId, administrator.userId(), "ENTITY_ADMIN", true))
+                .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "ACTIVE")));
+        when(repository.findByClientMessageId(emergencyId, clientId))
+                .thenReturn(Optional.of(new ChatMessageData(42L, clientId, administrator.userId(), "ENTITY_ADMIN", "Hello", now)));
+        service.send(administrator, emergencyId, new ChatMessageInput(clientId, "Hello"));
+        verify(administration, never()).startAttention(any(), any());
+    }
+
+    @Test
+    void administratorMessageOnAlreadyAttendedEmergencyDoesNotTransitionAgain() {
+        AuthenticatedIdentity administrator = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false);
+        UUID clientId = UUID.randomUUID();
+        when(repository.findAuthorizedEmergency(emergencyId, administrator.userId(), "ENTITY_ADMIN", true))
+                .thenReturn(Optional.of(new ChatRepository.EmergencyData(emergencyId, "IN_PROGRESS")));
+        when(repository.insert(emergencyId, administrator.userId(), clientId, "Hello", now))
+                .thenReturn(new ChatMessageData(42L, clientId, administrator.userId(), "ENTITY_ADMIN", "Hello", now));
+        service.send(administrator, emergencyId, new ChatMessageInput(clientId, "Hello"));
+        verify(administration, never()).startAttention(any(), any());
     }
 
     @Test
@@ -94,7 +135,7 @@ class ChatServiceImplTest {
     @Test
     void rejectsMessagesLongerThanTheConfiguredLimitBeforeLookingUpTheEmergency() {
         ChatServiceImpl restricted = new ChatServiceImpl(repository, Clock.fixed(now, ZoneOffset.UTC), events,
-                configuration((short) 5), audit);
+                configuration((short) 5), audit, administration);
 
         assertThatThrownBy(() -> restricted.send(owner, emergencyId, new ChatMessageInput(UUID.randomUUID(), "123456")))
                 .isInstanceOf(RuleViolationException.class);

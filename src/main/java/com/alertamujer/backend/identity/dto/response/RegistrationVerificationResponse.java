@@ -2,6 +2,6 @@ package com.alertamujer.backend.identity.dto.response;
 
 import java.util.UUID;
 
-/** Safe state after a registration-channel OTP has been consumed. */
+/** Estado seguro después de consumir el OTP de un canal de registro. */
 public record RegistrationVerificationResponse(String status, UUID userId) {
 }

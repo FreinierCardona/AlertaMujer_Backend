@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** OTP proof for an unchanged candidate contact. */
+/** Prueba OTP para un dato de contacto propuesto que no ha cambiado. */
 public record ContactChangeVerifyInput(
         @Pattern(regexp = "^(email|phone)$") String field,
         @NotBlank @Size(max = 254) String value,

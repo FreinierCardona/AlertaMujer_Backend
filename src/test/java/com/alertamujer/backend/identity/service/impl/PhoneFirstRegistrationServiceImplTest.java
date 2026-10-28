@@ -54,6 +54,23 @@ class PhoneFirstRegistrationServiceImplTest {
     }
 
     @Test
+    void reportsUsernameConflictBeforeCreatingRequest() {
+        when(repository.existsPhoneFirstIdentityConflict("@ana_user", null)).thenReturn(true);
+        assertThatThrownBy(() -> service(true).start(new PhoneFirstRegistrationInput("@ana_user", "Ana", "Perez", "3001234567")))
+                .isInstanceOf(com.alertamujer.backend.shared.errors.RegistrationConflictException.class)
+                .extracting("field").isEqualTo("username");
+        verify(repository, never()).insertPhoneFirstRegistrationRequest(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void reportsPhoneConflictIndependently() {
+        when(repository.existsPhoneFirstIdentityConflict(null, "3001234567")).thenReturn(true);
+        assertThatThrownBy(() -> service(true).start(new PhoneFirstRegistrationInput("@ana_user", "Ana", "Perez", "3001234567")))
+                .isInstanceOf(com.alertamujer.backend.shared.errors.RegistrationConflictException.class)
+                .extracting("field").isEqualTo("phone");
+    }
+
+    @Test
     void startsPhoneFirstFlowWithOnlyAHashedProofAndAnEphemeralSimulatorCode() {
         PhoneFirstRegistrationServiceImpl service = service(true);
         when(repository.existsPhoneFirstIdentityConflict("@ana_user", "3001234567")).thenReturn(false);
