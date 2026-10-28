@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SQL limited to the deployed identity/profile grants used by HU-API-010. */
+/** SQL limitado a los permisos de identidad y perfil desplegados que utiliza HU-API-010. */
 @Repository
 public class ProfileRepository {
     private final JdbcTemplate jdbc;

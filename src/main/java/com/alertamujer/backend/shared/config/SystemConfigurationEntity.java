@@ -7,10 +7,9 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.Immutable;
 
 /**
- * Read-only mapping of the singleton supplied by HU-DB-008.
- *
- * <p>The application role only has SELECT permission for this table. Changes
- * are versioned in the database repository, never made by this application.</p>
+ * Mapeo de solo lectura de la fila única proporcionada por HU-DB-008. El rol de aplicación solo tiene
+ * permiso SELECT sobre esta tabla. Los cambios se versionan en el repositorio Database y nunca se
+ * realizan desde esta aplicación.
  */
 @Entity
 @Immutable

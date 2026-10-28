@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** JDBC access to the migrated, append-only emergency chat table. */
+/** Acceso JDBC a la tabla migrada de mensajes de emergencia, que solo admite agregar registros. */
 @Repository
 public class ChatRepository {
     private final JdbcTemplate jdbc;

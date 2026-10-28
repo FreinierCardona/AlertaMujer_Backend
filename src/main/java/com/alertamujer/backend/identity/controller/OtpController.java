@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for public registration and password-recovery OTP issuance. */
+/** Adaptador HTTP de la emisión de OTP para registro público y recuperación de contraseña. */
 @RestController
 @RequestMapping("/api/v1")
 public class OtpController {

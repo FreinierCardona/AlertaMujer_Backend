@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
-/** Sanitizes the small whitelist of state values before they are persisted as JSON objects. */
+/** Depura el conjunto limitado de valores de estado permitidos antes de guardarlos como objetos JSON. */
 @Service
 class AuditServiceImpl implements AuditService {
     private static final int DESCRIPTION_LIMIT = 500;

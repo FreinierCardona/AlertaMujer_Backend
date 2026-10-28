@@ -52,6 +52,16 @@ class AdministrationServiceImplTest {
     }
 
     @Test
+    void includesFinalizedAlertsInDashboard() {
+        when(repository.dashboard()).thenReturn(new AdministrationRepository.DashboardData(2, 3, 1, 4));
+        var result = service.dashboard(administrator);
+        assertThat(result.activeCount()).isEqualTo(2);
+        assertThat(result.inProgressCount()).isEqualTo(3);
+        assertThat(result.offlineCount()).isEqualTo(1);
+        assertThat(result.finalizedCount()).isEqualTo(4);
+    }
+
+    @Test
     void refusesAUserEvenWhenTheBodyCannotChooseAnotherRole() {
         AuthenticatedIdentity user = new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "USER", false);
         assertThatThrownBy(() -> service.dashboard(user)).isInstanceOf(ForbiddenException.class);

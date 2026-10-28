@@ -21,7 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** End-to-end HTTP proof for the authenticated contacts contract and retired token route. */
+/** Prueba HTTP de extremo a extremo del contrato autenticado de contactos y la ruta retirada de tokens. */
 class ContactHttpPostgreSqlIntegrationTest {
 
     private static final String PASSWORD = "SecurePass#2026";

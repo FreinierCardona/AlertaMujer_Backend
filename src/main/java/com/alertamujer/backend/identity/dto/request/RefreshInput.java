@@ -2,6 +2,6 @@ package com.alertamujer.backend.identity.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 
-/** Opaque refresh token supplied only to the renewal endpoint. */
+/** Token opaco de renovación entregado únicamente al punto de entrada de renovación. */
 public record RefreshInput(@NotBlank String refreshToken) {
 }

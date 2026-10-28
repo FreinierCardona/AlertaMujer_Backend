@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Protected REST routes for evidence metadata and final WebP bytes. */
+/** Rutas REST protegidas para los metadatos de evidencias y los bytes finales WebP. */
 @RestController
 @RequestMapping("/api/v1")
 public class EvidenceController {

@@ -7,7 +7,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Local-only operational command for RN-ADM-02B; it is intentionally not an HTTP route. */
+/** Comando operativo exclusivamente local para RN-ADM-02B; no constituye una ruta HTTP. */
 @Component
 @Profile("local")
 class AdministratorReplacementRunner implements ApplicationRunner {

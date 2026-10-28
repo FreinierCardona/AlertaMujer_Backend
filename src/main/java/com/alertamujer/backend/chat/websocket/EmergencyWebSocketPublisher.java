@@ -9,12 +9,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/** Emits only committed emergency events; STOMP transport never confirms an uncommitted write. */
+/** Publica eventos STOMP después del commit para no anunciar escrituras que puedan revertirse. */
 @Component
 class EmergencyWebSocketPublisher {
     private final SimpMessagingTemplate messaging;
 
-    EmergencyWebSocketPublisher(SimpMessagingTemplate messaging) { this.messaging = messaging; }
+    EmergencyWebSocketPublisher(SimpMessagingTemplate messaging) {
+        this.messaging = messaging;
+    }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void afterMessageCommit(EmergencyMessageCreatedEvent event) {
@@ -29,9 +31,12 @@ class EmergencyWebSocketPublisher {
                 event.status(), event.occurredAt()));
     }
 
-    private String topic(UUID emergencyId) { return "/topic/emergencies/" + emergencyId; }
+    private String topic(UUID emergencyId) {
+        return "/topic/emergencies/" + emergencyId;
+    }
 
     private record MessageEvent(String type, UUID emergencyId, long messageId, UUID clientMessageId,
             UUID senderUserId, String senderRole, String content, Instant sentAt) { }
+
     private record StatusEvent(String type, UUID emergencyId, String status, Instant occurredAt) { }
 }

@@ -1,6 +1,6 @@
 package com.alertamujer.backend.identity.model;
 
-/** Delivery channels physically supported by the identity OTP table. */
+/** Canales de entrega admitidos físicamente por la tabla OTP de identidad. */
 public enum OtpChannel {
     EMAIL,
     SMS,

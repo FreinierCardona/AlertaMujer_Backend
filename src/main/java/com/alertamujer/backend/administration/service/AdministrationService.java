@@ -10,7 +10,7 @@ import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import com.alertamujer.backend.shared.validation.PageResponse;
 import java.util.UUID;
 
-/** Administrative use cases; business ownership stays in the identity and emergency services. */
+/** Casos de uso administrativos; las reglas de negocio siguen a cargo de los servicios de identidad y emergencia. */
 public interface AdministrationService {
     DashboardResponse dashboard(AuthenticatedIdentity identity);
 
@@ -30,7 +30,7 @@ public interface AdministrationService {
 
     PageResponse<AuditLogResponse> auditLogs(AuthenticatedIdentity identity, int page, int size);
 
-    /** Internal scheduler operation; it is deliberately not exposed through HTTP. */
+    /** Operación interna del planificador que no se expone mediante HTTP. */
     boolean disableUserIfStillInactive(UUID userId);
 
     void replaceAdministrator(UUID targetUserId);

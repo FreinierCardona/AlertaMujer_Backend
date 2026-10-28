@@ -4,7 +4,6 @@ import com.alertamujer.backend.chat.service.ChatService;
 import com.alertamujer.backend.identity.service.AuthenticationService;
 import com.alertamujer.backend.shared.errors.ForbiddenException;
 import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
-import com.alertamujer.backend.shared.errors.StateConflictException;
 import com.alertamujer.backend.shared.errors.UnauthorizedException;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import com.alertamujer.backend.shared.security.IdentityAuthentication;
@@ -17,12 +16,12 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 
-/** Applies the REST token and emergency authorization rules to every relevant STOMP frame. */
+/** Aplica las reglas REST de token y autorización de emergencia a cada trama STOMP pertinente. */
 @Component
 public class StompAuthenticationInterceptor implements ChannelInterceptor {
     private static final Pattern TOPIC = Pattern.compile("^/topic/emergencies/([0-9a-fA-F-]{36})$");
@@ -41,13 +40,14 @@ public class StompAuthenticationInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) return message;
         StompCommand command = accessor.getCommand();
         if (command == null) return message;
         if (StompCommand.CONNECT.equals(command) || StompCommand.STOMP.equals(command)) {
             AuthenticatedIdentity identity = authenticate(accessor.getFirstNativeHeader("Authorization"));
             accessor.setUser(new IdentityAuthentication(identity));
-            return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
+            return message;
         }
         if (StompCommand.SUBSCRIBE.equals(command)) {
             AuthenticatedIdentity identity = identity(accessor);

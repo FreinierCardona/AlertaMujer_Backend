@@ -25,7 +25,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Validates HU-API-018 internal work against the migrated application-role database. */
+/** Valida las tareas internas de HU-API-018 contra la base migrada usando el rol de aplicación. */
 class InternalJobsPostgreSqlIntegrationTest {
     @Test
     void performsBoundedIdentityCleanupTimeoutInactivityAndOrphanReconciliation() throws Exception {

@@ -3,7 +3,7 @@ package com.alertamujer.backend.shared.security;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-/** SecurityContext token whose authority originates in the current account, never a request body. */
+/** Token de SecurityContext cuyos permisos provienen de la cuenta actual, nunca del cuerpo de una solicitud. */
 public final class IdentityAuthentication extends AbstractAuthenticationToken {
 
     private final AuthenticatedIdentity identity;

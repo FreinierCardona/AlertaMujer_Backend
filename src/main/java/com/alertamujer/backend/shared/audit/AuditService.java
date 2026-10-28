@@ -1,6 +1,6 @@
 package com.alertamujer.backend.shared.audit;
 
-/** Appends only the administrative events allowed by the database constraint. */
+/** Agrega únicamente los eventos administrativos permitidos por la restricción de base de datos. */
 public interface AuditService {
     void record(AuditEvent event);
 

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for the authenticated own-profile routes in HU-API-010. */
+/** Adaptador HTTP de las rutas autenticadas del perfil propio en HU-API-010. */
 @RestController
 @RequestMapping("/api/v1/me")
 public class ProfileController {

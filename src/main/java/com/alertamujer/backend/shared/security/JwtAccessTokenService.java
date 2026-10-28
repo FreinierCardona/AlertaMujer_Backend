@@ -21,7 +21,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.stereotype.Component;
 
-/** Issues and verifies the deliberately small HS256 access-token contract. */
+/** Emite y verifica tokens HS256 con identidad, rol y referencia a la sesión persistida. */
 @Component
 public class JwtAccessTokenService {
 
@@ -39,6 +39,7 @@ public class JwtAccessTokenService {
         SecretKey key = new SecretKeySpec(secretBytes, "HmacSHA256");
         this.encoder = new NimbusJwtEncoder(new ImmutableSecret<>(key));
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        // Combina la validación temporal y del emisor con la audiencia esperada por estos clientes.
         OAuth2TokenValidator<Jwt> issuerAndTime = JwtValidators.createDefaultWithIssuer(ISSUER);
         OAuth2TokenValidator<Jwt> audience = jwt -> jwt.getAudience().contains(AUDIENCE)
                 ? OAuth2TokenValidatorResult.success()
@@ -50,6 +51,7 @@ public class JwtAccessTokenService {
         this.decoder = jwtDecoder;
     }
 
+    // Firma las credenciales indicadas con las fechas de emisión y caducidad suministradas.
     public String issue(UUIDClaims claims, Instant now, Instant expiresAt) {
         JwtClaimsSet claimSet = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -65,6 +67,7 @@ public class JwtAccessTokenService {
                 .getTokenValue();
     }
 
+    // Devuelve los claims solo después de validar firma, emisor, audiencia y vigencia.
     public Jwt decode(String accessToken) {
         return decoder.decode(accessToken);
     }

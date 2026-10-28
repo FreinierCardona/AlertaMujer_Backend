@@ -22,9 +22,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Validates and normalizes transferred WebP evidence below the private configured directory. */
+/** Valida el contenedor WebP y almacena sus bytes en el directorio privado configurado. */
 @Component
 class LocalEvidenceStorage implements EvidenceStorage {
+    // Límite absoluto en bytes; la configuración puede imponer uno menor.
     static final int MAX_WEBP_BYTES = 500_000;
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalEvidenceStorage.class);
     private final String storagePath;
@@ -47,6 +48,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
         Path root = configuredRoot();
         Files.createDirectories(root);
         String reference = UUID.randomUUID() + ".webp";
+        // Escribe primero un archivo temporal para no exponer una evidencia parcialmente guardada.
         Path temporary = root.resolve("." + UUID.randomUUID() + ".tmp");
         Path target = root.resolve(reference);
         try {
@@ -77,6 +79,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
         deleteTwice(candidate, "Evidence cleanup attempt failed; reconciliation will retry.");
     }
 
+    /** Elimina archivos sin referencia persistida que hayan superado la fecha de corte. */
     @Override
     public int deleteUnreferencedOlderThan(Collection<String> references, Instant cutoff) {
         Path root;
@@ -121,9 +124,11 @@ class LocalEvidenceStorage implements EvidenceStorage {
         }
     }
 
+    // Comprueba cabecera, tamaños y bloques RIFF; no decodifica los píxeles de la imagen.
     private boolean isWebpContainer(byte[] bytes) {
         if (bytes.length < 20 || bytes[0] != 'R' || bytes[1] != 'I' || bytes[2] != 'F' || bytes[3] != 'F'
                 || bytes[8] != 'W' || bytes[9] != 'E' || bytes[10] != 'B' || bytes[11] != 'P') return false;
+        // RIFF expresa el tamaño en little-endian y excluye los primeros ocho bytes.
         long declaredRiffSize = Integer.toUnsignedLong((bytes[4] & 0xff)
                 | ((bytes[5] & 0xff) << 8) | ((bytes[6] & 0xff) << 16) | ((bytes[7] & 0xff) << 24));
         if (declaredRiffSize != bytes.length - 8L) return false;
@@ -135,6 +140,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
             long chunkSize = Integer.toUnsignedLong((bytes[start + 4] & 0xff)
                     | ((bytes[start + 5] & 0xff) << 8) | ((bytes[start + 6] & 0xff) << 16)
                     | ((bytes[start + 7] & 0xff) << 24));
+            // Cada bloque incluye ocho bytes de cabecera y relleno si su contenido tiene tamaño impar.
             offset += 8 + chunkSize + (chunkSize & 1);
             if (offset > bytes.length) return false;
             imageChunkFound |= Arrays.equals(chunkType, new byte[] {'V', 'P', '8', ' '})
@@ -148,6 +154,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
         return Path.of(storagePath).toAbsolutePath().normalize();
     }
 
+    // Acepta únicamente referencias internas y comprueba que la ruta permanezca dentro del almacén.
     private Path resolveReference(String reference) throws IOException {
         if (reference == null || !reference.matches("[0-9a-fA-F-]{36}\\.webp")) throw new IOException("Invalid evidence reference");
         Path root = configuredRoot();

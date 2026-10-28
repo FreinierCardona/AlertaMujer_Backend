@@ -24,7 +24,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Verifies the HU-API-011 state machine and canonical-pair constraint with the application role. */
+/** Verifica la máquina de estados de HU-API-011 y la restricción de pareja canónica con el rol de aplicación. */
 class ContactPostgreSqlIntegrationTest {
 
     @Test

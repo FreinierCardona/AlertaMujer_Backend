@@ -138,12 +138,12 @@ class SharedHttpContractTest {
 
         @PostMapping("/validation")
         public void validate(@Valid @RequestBody ValidationInput input) {
-            // Validation happens before an application service is invoked.
+            // La validación ocurre antes de invocar un servicio de aplicación.
         }
 
         @GetMapping("/page")
         public void page(@Valid PageParameters parameters) {
-            // A real controller passes only validated parameters to its service.
+            // Un controlador real entrega a su servicio únicamente parámetros validados.
         }
 
         @GetMapping("/business")

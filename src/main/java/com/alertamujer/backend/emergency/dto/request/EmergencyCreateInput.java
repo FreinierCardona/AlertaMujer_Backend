@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** Initial location supplied when a USER activates SOS. */
+/** Ubicación inicial proporcionada cuando un usuario con rol USER activa el SOS. */
 public record EmergencyCreateInput(
         @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
         @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitude,

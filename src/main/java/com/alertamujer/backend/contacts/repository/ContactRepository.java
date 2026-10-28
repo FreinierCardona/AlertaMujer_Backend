@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SQL for the existing contact table and its canonical-pair constraint. */
+/** SQL de la tabla de contactos existente y su restricción de pareja canónica. */
 @Repository
 public class ContactRepository {
 

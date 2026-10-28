@@ -14,8 +14,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Persistable;
 
 /**
- * Temporary identity data held until HU-API-008 completes both verifications.
- * This entity deliberately has no relation to users or credentials.
+ * Datos temporales de identidad conservados hasta que HU-API-008 complete ambas verificaciones. Esta
+ * entidad no tiene relación con usuarios ni credenciales.
  */
 @Entity
 @Table(name = "registration_requests", schema = "identity")

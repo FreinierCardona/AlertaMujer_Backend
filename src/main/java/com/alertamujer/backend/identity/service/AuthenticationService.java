@@ -7,7 +7,7 @@ import com.alertamujer.backend.identity.dto.response.SessionResponse;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.util.UUID;
 
-/** Session and password operations defined by HU-API-009. */
+/** Operaciones de sesión y contraseña definidas por HU-API-009. */
 public interface AuthenticationService {
 
     SessionResponse login(LoginInput input);

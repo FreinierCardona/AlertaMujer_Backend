@@ -26,7 +26,10 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 
-/** Exercises HU-API-015 against the migrated PostgreSQL table and application grants when credentials are supplied. */
+/**
+ * Prueba HU-API-015 contra la tabla PostgreSQL migrada y los permisos de aplicación cuando se
+ * proporcionan credenciales.
+ */
 class EvidencePostgreSqlIntegrationTest {
     @Test
     void persistsOnlyMetadataForAnOwnedOpenEmergency() throws Exception {

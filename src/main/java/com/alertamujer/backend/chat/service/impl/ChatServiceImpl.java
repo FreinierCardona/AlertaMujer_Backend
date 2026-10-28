@@ -1,5 +1,6 @@
 package com.alertamujer.backend.chat.service.impl;
 
+import com.alertamujer.backend.administration.service.AdministrationService;
 import com.alertamujer.backend.chat.dto.request.ChatMessageInput;
 import com.alertamujer.backend.chat.dto.response.ChatMessageResponse;
 import com.alertamujer.backend.chat.event.EmergencyMessageCreatedEvent;
@@ -22,7 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Locks the emergency root before an append, so idempotency and status are revalidated atomically. */
+/** Bloquea la emergencia al enviar para validar su estado y evitar mensajes duplicados en una misma transacción. */
 @Service
 class ChatServiceImpl implements ChatService {
     private final ChatRepository repository;
@@ -30,22 +31,25 @@ class ChatServiceImpl implements ChatService {
     private final ApplicationEventPublisher eventPublisher;
     private final SystemConfigurationValues configuration;
     private final AuditService auditService;
+    private final AdministrationService administrationService;
 
     @Autowired
     ChatServiceImpl(ChatRepository repository, ApplicationEventPublisher eventPublisher,
-            SystemConfigurationValues configuration, AuditService auditService) {
-        this(repository, Clock.systemUTC(), eventPublisher, configuration, auditService);
+            SystemConfigurationValues configuration, AuditService auditService, AdministrationService administrationService) {
+        this(repository, Clock.systemUTC(), eventPublisher, configuration, auditService, administrationService);
     }
 
     ChatServiceImpl(ChatRepository repository, Clock clock, ApplicationEventPublisher eventPublisher,
-            SystemConfigurationValues configuration, AuditService auditService) {
+            SystemConfigurationValues configuration, AuditService auditService, AdministrationService administrationService) {
         this.repository = repository;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.auditService = auditService;
+        this.administrationService = administrationService;
     }
 
+    /** Consulta mensajes posteriores al cursor; registra las lecturas administrativas en auditoría. */
     @Override
     @Transactional
     public List<ChatMessageResponse> list(AuthenticatedIdentity identity, UUID emergencyId, long after, int size) {
@@ -69,15 +73,21 @@ class ChatServiceImpl implements ChatService {
         var emergency = authorize(identity, emergencyId, true);
         if (!isOperational(emergency.status())) throw new StateConflictException();
 
+        // El identificador del cliente permite devolver el mismo mensaje cuando se reintenta el envío.
         ChatMessageData existing = repository.findByClientMessageId(emergencyId, input.clientMessageId()).orElse(null);
         if (existing != null) return response(existing);
 
         ChatMessageResponse message = response(repository.insert(emergencyId, identity.userId(), input.clientMessageId(), content,
                 clock.instant()));
+        // El primer mensaje nuevo del administrador inicia atención en la misma transacción.
+        if ("ENTITY_ADMIN".equals(identity.role()) && "ACTIVE".equals(emergency.status())) {
+            administrationService.startAttention(identity, emergencyId);
+        }
         eventPublisher.publishEvent(new EmergencyMessageCreatedEvent(emergencyId, message));
         return message;
     }
 
+    /** Aplica la autorización de lectura antes de permitir la suscripción al canal de la emergencia. */
     @Override
     @Transactional(readOnly = true)
     public void authorizeSubscription(AuthenticatedIdentity identity, UUID emergencyId) {
@@ -85,6 +95,7 @@ class ChatServiceImpl implements ChatService {
         authorize(identity, emergencyId, false);
     }
 
+    // La consulta restringe por usuario y rol; lock solicita además el bloqueo para escritura.
     private ChatRepository.EmergencyData authorize(AuthenticatedIdentity identity, UUID emergencyId, boolean lock) {
         return repository.findAuthorizedEmergency(emergencyId, identity.userId(), identity.role(), lock)
                 .orElseThrow(ResourceNotFoundException::new);
@@ -103,7 +114,9 @@ class ChatServiceImpl implements ChatService {
         return normalized;
     }
 
-    private boolean isOperational(String status) { return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status); }
+    private boolean isOperational(String status) {
+        return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status);
+    }
 
     private ChatMessageResponse response(ChatMessageData message) {
         return new ChatMessageResponse(message.id(), message.clientMessageId(), message.senderUserId(),

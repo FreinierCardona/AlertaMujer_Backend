@@ -21,8 +21,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Defines only the cross-cutting security response contract. Authentication and
- * authorization rules are added by their corresponding identity HUs.
+ * Define únicamente el contrato transversal de respuestas de seguridad. Las reglas de autenticación y
+ * autorización se agregan en sus correspondientes HUs de identidad.
  */
 @Configuration
 @EnableWebSecurity
@@ -75,9 +75,9 @@ public class SecurityConfiguration {
     }
 
     /**
-     * Allows only configured browser origins. Native mobile clients do not send
-     * an Origin header, while the web application uses a Bearer token instead
-     * of cross-site cookies, so credentials are intentionally not enabled.
+     * Permite solo los orígenes de navegador configurados. Los clientes móviles nativos no envían la
+     * cabecera Origin; la aplicación web usa un token Bearer en lugar de cookies entre sitios, por lo que
+     * no se habilitan credenciales.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(
@@ -105,8 +105,8 @@ public class SecurityConfiguration {
     }
 
     /**
-     * Hashes credentials before they reach the persistence layer. The raw
-     * password is accepted only by the registration request DTOs.
+     * Calcula el hash de las credenciales antes de que lleguen a persistencia. La contraseña sin procesar
+     * se acepta solo en los DTO de solicitud de registro.
      */
     @Bean
     PasswordEncoder passwordEncoder() {

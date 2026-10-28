@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Applies the documented three-month inactivity rule without an administrative HTTP route. */
+/** Aplica la regla documentada de tres meses de inactividad sin exponer una ruta HTTP administrativa. */
 @Component
 class InactiveAccountScheduler {
     private static final Logger LOGGER = LoggerFactory.getLogger(InactiveAccountScheduler.class);

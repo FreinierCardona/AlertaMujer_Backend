@@ -15,9 +15,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Runs only when a migrated PostgreSQL database is supplied through the same
- * environment variables used by the application. It never provisions a schema
- * or connects with an owner or migrator account.
+ * Se ejecuta solo si se proporciona una base PostgreSQL migrada mediante las mismas variables de
+ * entorno que usa la aplicación. Nunca crea esquemas ni se conecta con una cuenta propietaria o
+ * migradora.
  */
 class PostgreSqlIntegrationTest {
 

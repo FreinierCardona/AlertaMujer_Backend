@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Public error shape defined by the REST contract. It intentionally contains no
- * exception details or request values.
+ * Estructura pública de error definida por el contrato REST. No contiene detalles de excepciones ni
+ * valores de la solicitud.
  */
 public record ApiError(
         String code,

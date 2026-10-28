@@ -22,7 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Applies the contact invitation state machine; PostgreSQL enforces the canonical pair. */
+/** Gestiona invitaciones; PostgreSQL impide duplicar una pareja aunque se invierta quién invita. */
 @Service
 class ContactServiceImpl implements ContactService {
 
@@ -63,6 +63,7 @@ class ContactServiceImpl implements ContactService {
             return new InvitationResult(response(new ContactData(contactId, actor.id(), target.id(), "PENDING",
                     now.plusSeconds(INVITATION_SECONDS), null)), true);
         }
+        // Recupera la relación existente si la pareja ya estaba registrada, incluso en sentido inverso.
         ContactData existing = repository.lockCanonicalPair(actor.id(), target.id()).orElseThrow(RuleViolationException::new);
         existing = expireIfNeeded(existing, now);
         if ("PENDING".equals(existing.status())) {
@@ -103,6 +104,7 @@ class ContactServiceImpl implements ContactService {
         repository.reject(relation.id(), now);
     }
 
+    /** Solo el emisor puede reactivar una invitación vencida; una pendiente conserva su vencimiento. */
     @Override
     @Transactional
     public ContactInvitationResponse reinvite(AuthenticatedIdentity identity, UUID contactId) {
@@ -124,6 +126,7 @@ class ContactServiceImpl implements ContactService {
         return new ContactInvitationResponse(relation.id(), "PENDING", expiresAt);
     }
 
+    /** Actualiza las invitaciones vencidas antes de construir la página y sus acciones disponibles. */
     @Override
     @Transactional
     public PageResponse<ContactResponse> ownContacts(AuthenticatedIdentity identity, int page, int size) {
@@ -172,6 +175,7 @@ class ContactServiceImpl implements ContactService {
                 direction, allowedActions(contact.status(), direction));
     }
 
+    // Las acciones dependen tanto del estado como de si el usuario envió o recibió la invitación.
     private List<ContactResponse.Action> allowedActions(String status, ContactResponse.Direction direction) {
         if ("PENDING".equals(status) && direction == ContactResponse.Direction.RECEIVED) {
             return List.of(ContactResponse.Action.ACCEPT, ContactResponse.Action.REJECT);

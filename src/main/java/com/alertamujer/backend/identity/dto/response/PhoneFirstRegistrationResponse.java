@@ -3,7 +3,7 @@ package com.alertamujer.backend.identity.dto.response;
 import java.time.Instant;
 import java.util.UUID;
 
-/** The opaque proof is returned once and is never persisted in plain text. */
+/** La prueba opaca se devuelve una sola vez y nunca se almacena en texto plano. */
 public record PhoneFirstRegistrationResponse(
         UUID registrationRequestId,
         String stage,

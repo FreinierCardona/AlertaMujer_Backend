@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Deletes only relative references contained by the configured private evidence directory. */
+/** Elimina únicamente referencias relativas contenidas en el directorio privado de evidencias configurado. */
 @Component
 class LocalEvidenceFileCleanup implements EvidenceFileCleanup {
     private static final Logger LOGGER = LoggerFactory.getLogger(LocalEvidenceFileCleanup.class);

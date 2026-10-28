@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Queries only the identity tables needed before a user account exists. */
+/** Consulta solo las tablas de identidad necesarias antes de que exista una cuenta de usuario. */
 public interface RegistrationRequestRepository extends JpaRepository<RegistrationRequestEntity, UUID> {
 
     @Query(value = """

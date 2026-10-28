@@ -23,12 +23,12 @@ foreach ($name in @('SPRING_DATASOURCE_URL', 'SPRING_DATASOURCE_USERNAME', 'SPRI
     }
 }
 
-# Docker reaches PostgreSQL through host.docker.internal. Maven runs on the host.
+# Docker accede a PostgreSQL mediante host.docker.internal. Maven se ejecuta en el equipo anfitrión.
 $env:SPRING_DATASOURCE_URL = $configuration['SPRING_DATASOURCE_URL'].Replace('host.docker.internal', '127.0.0.1')
 $env:SPRING_DATASOURCE_USERNAME = $configuration['SPRING_DATASOURCE_USERNAME']
 $env:SPRING_DATASOURCE_PASSWORD = $configuration['SPRING_DATASOURCE_PASSWORD']
 
-# This test-only key prevents a local Docker key from changing the test profile.
+# Esta clave exclusiva de pruebas evita que una clave local de Docker altere el perfil de pruebas.
 $env:JWT_SECRET = 'test-only-hs256-secret-with-at-least-32-bytes'
 
 Push-Location $repositoryRoot

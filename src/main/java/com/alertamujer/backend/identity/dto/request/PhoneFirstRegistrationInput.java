@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Non-sensitive first step of public registration. */
+/** Primer paso del registro público, sin datos sensibles. */
 public record PhoneFirstRegistrationInput(
         @NotBlank @Pattern(regexp = "^@[a-z0-9](?:[a-z0-9_]{1,18}[a-z0-9])$",
                 message = "must be @ followed by 3 to 20 lowercase letters, numbers or underscores")

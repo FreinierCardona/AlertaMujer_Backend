@@ -1,6 +1,6 @@
 package com.alertamujer.backend.identity.model;
 
-/** Ordered temporary stages for the public v2 phone-first registration flow. */
+/** Etapas temporales ordenadas del flujo público v2 de registro que comienza por el teléfono. */
 public enum RegistrationStage {
     PHONE_PENDING,
     PHONE_VERIFIED,

@@ -23,7 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** HTTP and PostgreSQL authorization proof for HU-API-022. */
+/** Prueba de autorización HTTP y PostgreSQL para HU-API-022. */
 class ContactAlertHttpPostgreSqlIntegrationTest {
     private static final String PASSWORD = "SecurePass#2026";
 

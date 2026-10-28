@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** JDBC access is append/read only, matching the grants of {@code alertamujer_app}. */
+/** El acceso JDBC solo permite agregar y leer registros, de acuerdo con los permisos de {@code alertamujer_app}. */
 @Repository
 public class AuditRepository {
     private final JdbcTemplate jdbc;

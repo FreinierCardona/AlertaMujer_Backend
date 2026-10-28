@@ -6,8 +6,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Rejects technical accounts other than the least-privilege application role.
- * Database ownership and migrations belong to the database repository.
+ * Rechaza cuentas técnicas distintas del rol de aplicación con privilegios mínimos. La propiedad y las
+ * migraciones de la base de datos corresponden al repositorio Database.
  */
 @Component
 public class ApplicationDatasourceGuard implements ApplicationRunner {

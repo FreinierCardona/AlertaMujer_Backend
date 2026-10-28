@@ -8,7 +8,7 @@ import com.alertamujer.backend.identity.dto.response.RegistrationVerificationRes
 import com.alertamujer.backend.identity.model.OtpChannel;
 import java.util.UUID;
 
-/** Public v2 flow; every continuation operation requires the opaque proof. */
+/** Flujo público v2; cada operación de continuación exige la prueba opaca. */
 public interface PhoneFirstRegistrationService {
 
     PhoneFirstRegistrationResponse start(PhoneFirstRegistrationInput input);

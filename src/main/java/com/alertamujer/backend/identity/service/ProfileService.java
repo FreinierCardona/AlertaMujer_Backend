@@ -9,7 +9,7 @@ import com.alertamujer.backend.identity.dto.response.OtpIssuedResponse;
 import com.alertamujer.backend.identity.dto.response.SosMessageResponse;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 
-/** Own-profile use cases defined by HU-API-010. */
+/** Casos de uso del perfil propio definidos por HU-API-010. */
 public interface ProfileService {
     AuthenticatedUserResponse getProfile(AuthenticatedIdentity identity);
     AuthenticatedUserResponse updateProfile(AuthenticatedIdentity identity, ProfileUpdateInput input);

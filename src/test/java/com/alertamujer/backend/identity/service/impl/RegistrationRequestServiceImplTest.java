@@ -15,6 +15,10 @@ import com.alertamujer.backend.identity.dto.response.RegistrationRequestResponse
 import com.alertamujer.backend.identity.model.AccountOrigin;
 import com.alertamujer.backend.identity.model.RegistrationRequestEntity;
 import com.alertamujer.backend.identity.repository.RegistrationRequestRepository;
+import com.alertamujer.backend.identity.repository.IdentityOtpRepository;
+import com.alertamujer.backend.identity.repository.IdentityOtpRepository.RegistrationRequestData;
+import java.util.Optional;
+import static org.mockito.Mockito.verifyNoInteractions;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
 import java.time.Clock;
@@ -29,17 +33,19 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class RegistrationRequestServiceImplTest {
 
     private RegistrationRequestRepository repository;
+    private IdentityOtpRepository identityRepository;
     private BCryptPasswordEncoder passwordEncoder;
     private RegistrationRequestServiceImpl service;
 
     @BeforeEach
     void setUp() {
         repository = mock(RegistrationRequestRepository.class);
+        identityRepository = mock(IdentityOtpRepository.class);
         passwordEncoder = new BCryptPasswordEncoder(4);
         SystemConfigurationValues configuration = new SystemConfigurationValues(
                 "I need help", (short) 30, (short) 60, (short) 10, 1_000_000,
                 (short) 500, (short) 180, (short) 5, (short) 3, (short) 300);
-        service = new RegistrationRequestServiceImpl(repository, passwordEncoder, configuration,
+        service = new RegistrationRequestServiceImpl(repository, identityRepository, passwordEncoder, configuration,
                 Clock.fixed(Instant.parse("2026-10-06T18:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -56,6 +62,7 @@ class RegistrationRequestServiceImplTest {
         RegistrationRequestEntity request = requestCaptor.getValue();
         assertThat(response.registrationRequestId()).isEqualTo(request.getRegistrationRequestId());
         assertThat(response.status()).isEqualTo("PENDING");
+        verifyNoInteractions(identityRepository);
         assertThat(request.getAccountOrigin()).isEqualTo(AccountOrigin.SELF_REGISTERED);
         assertThat(request.getAcceptedTermsAt()).isEqualTo(Instant.parse("2026-10-06T18:00:00Z"));
         assertThat(request.getExpiresAt()).isEqualTo(Instant.parse("2026-10-06T21:00:00Z"));
@@ -65,17 +72,27 @@ class RegistrationRequestServiceImplTest {
     }
 
     @Test
-    void createsAdministrativeRequestWithoutTermsOrClientSelectedRole() {
+    void completesAdministrativeAccountWithoutOtpOrAcceptingTerms() {
         when(repository.existsIdentityConflict(anyString(), anyString(), anyString())).thenReturn(false);
         when(repository.saveAndFlush(any(RegistrationRequestEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.startAdministrativeRegistration(new AdminRegistrationRequestInput(
+        when(identityRepository.lockRegistrationRequest(any())).thenAnswer(invocation -> Optional.of(
+                new RegistrationRequestData(invocation.getArgument(0), "@admin_user", "Ana", "Perez",
+                        "ana@example.com", "3001234567", "PENDING", Instant.parse("2026-10-06T21:00:00Z"),
+                        AccountOrigin.ADMIN_CREATED, null)));
+        RegistrationRequestResponse response = service.startAdministrativeRegistration(new AdminRegistrationRequestInput(
                 "@admin_user", "Ana", "Perez", "ANA@EXAMPLE.COM", "3001234567", "SecurePass#2026"));
 
         ArgumentCaptor<RegistrationRequestEntity> requestCaptor = ArgumentCaptor.forClass(RegistrationRequestEntity.class);
         verify(repository).saveAndFlush(requestCaptor.capture());
         RegistrationRequestEntity request = requestCaptor.getValue();
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        ArgumentCaptor<RegistrationRequestData> data = ArgumentCaptor.forClass(RegistrationRequestData.class);
+        verify(identityRepository).createUserAndCredential(data.capture(),
+                org.mockito.ArgumentMatchers.eq(request.getPasswordHash()), org.mockito.ArgumentMatchers.eq(request.getCreatedAt()));
+        assertThat(data.getValue().accountOrigin()).isEqualTo(AccountOrigin.ADMIN_CREATED);
+        verify(identityRepository).markRegistrationCompleted(request.getId(), request.getCreatedAt());
         assertThat(request.getAccountOrigin()).isEqualTo(AccountOrigin.ADMIN_CREATED);
         assertThat(request.getAcceptedTermsAt()).isNull();
         assertThat(request.getEmail()).isEqualTo("ana@example.com");

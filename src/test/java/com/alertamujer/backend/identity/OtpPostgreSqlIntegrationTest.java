@@ -24,7 +24,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Verifies the deployed grants, hash functions, and atomic registration flow. */
+/** Verifica los permisos desplegados, las funciones de hash y la atomicidad del flujo de registro. */
 class OtpPostgreSqlIntegrationTest {
 
     @Test

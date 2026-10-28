@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for the two ways of starting the identity registration flow. */
+/** Adaptador HTTP de las dos formas de iniciar el flujo de registro de identidad. */
 @RestController
 @RequestMapping("/api/v1")
 public class RegistrationRequestController {

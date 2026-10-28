@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Keeps physical evidence cleanup inside its owning module and outside public HTTP. */
+/** Mantiene la limpieza física de evidencias dentro de su módulo y fuera del acceso HTTP público. */
 @Component
 class EvidenceReconciliationScheduler {
     private static final Logger LOGGER = LoggerFactory.getLogger(EvidenceReconciliationScheduler.class);

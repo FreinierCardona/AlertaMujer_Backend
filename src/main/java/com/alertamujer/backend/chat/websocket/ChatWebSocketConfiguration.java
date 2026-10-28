@@ -10,7 +10,7 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-/** Limits STOMP to the documented endpoint, application prefix and per-emergency topics. */
+/** Limita STOMP al punto de entrada, al prefijo de aplicación y a los canales por emergencia documentados. */
 @Configuration
 @EnableWebSocketMessageBroker
 public class ChatWebSocketConfiguration implements WebSocketMessageBrokerConfigurer {

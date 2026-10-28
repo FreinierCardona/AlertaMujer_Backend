@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** A GPS point confirmed by the client for an already-created SOS. */
+/** Punto GPS confirmado por el cliente para un SOS ya creado. */
 public record LocationInput(
         @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
         @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitude,

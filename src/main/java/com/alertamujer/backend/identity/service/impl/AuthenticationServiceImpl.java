@@ -27,11 +27,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Keeps authentication state in PostgreSQL so JWTs remain revocable. */
+/** Mantiene las sesiones en PostgreSQL para poder revocar el acceso aunque el JWT siga vigente. */
 @Service
 class AuthenticationServiceImpl implements AuthenticationService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    // Permite ejecutar la comprobación BCrypt también cuando no se encuentra la cuenta.
     private static final String DUMMY_PASSWORD_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOHiLJhJe0KzE8Q7xYfTMx0mV5ykJ7XHi";
     private static final long MOBILE_SESSION_SECONDS = 60L * 24 * 60 * 60;
     private static final long ADMIN_SESSION_SECONDS = 10 * 60L;
@@ -57,8 +58,11 @@ class AuthenticationServiceImpl implements AuthenticationService {
 
     AuthenticationServiceImpl(IdentityAuthenticationRepository repository, PasswordEncoder passwordEncoder,
             JwtAccessTokenService jwt, Clock clock, AuditService auditService) {
-        this.repository = repository; this.passwordEncoder = passwordEncoder; this.jwt = jwt;
-        this.clock = clock; this.auditService = auditService;
+        this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwt = jwt;
+        this.clock = clock;
+        this.auditService = auditService;
     }
 
     @Override
@@ -73,8 +77,8 @@ class AuthenticationServiceImpl implements AuthenticationService {
         if (!user.isEnabled() || !passwordEncoder.matches(input.password(), passwordHash)) {
             throw new UnauthorizedException();
         }
-        // The inactivity job locks the same root row. Revalidate after the password work so it cannot
-        // disable an account that has just logged in, nor create a session after it has been disabled.
+        // Comparte el bloqueo con la tarea de inactividad y revalida la cuenta tras comprobar la contraseña.
+        // Así evita crear una sesión para una cuenta deshabilitada durante esa comprobación.
         user = repository.lockUser(user.id()).orElseThrow(UnauthorizedException::new);
         if (!user.isEnabled()) {
             throw new UnauthorizedException();
@@ -92,6 +96,7 @@ class AuthenticationServiceImpl implements AuthenticationService {
         return sessionResponse(user, sessionId, refreshToken, now);
     }
 
+    /** Valida y rota el token de renovación bajo bloqueo para impedir su reutilización concurrente. */
     @Override
     @Transactional
     public SessionResponse refresh(String refreshToken) {
@@ -117,8 +122,9 @@ class AuthenticationServiceImpl implements AuthenticationService {
         repository.revokeSession(identity.sessionId(), clock.instant());
     }
 
+    /** Valida el código de recuperación y, al cambiar la contraseña, revoca todas las sesiones. */
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidPasswordResetCodeException.class)
     public void confirmPasswordReset(PasswordResetConfirmInput input) {
         String email = input.email().trim().toLowerCase(Locale.ROOT);
         UserAccount user = repository.lockUserByEmail(email).orElseThrow(RuleViolationException::new);
@@ -130,7 +136,7 @@ class AuthenticationServiceImpl implements AuthenticationService {
         }
         if (!passwordEncoder.matches(input.code(), repository.readVerificationCodeHash(code.id()))) {
             repository.recordFailedVerificationAttempt(code.id(), now);
-            throw new RuleViolationException();
+            throw new InvalidPasswordResetCodeException();
         }
         repository.markVerificationCodeUsed(code.id(), now);
         repository.updatePassword(user.id(), passwordEncoder.encode(input.newPassword()), now);
@@ -154,6 +160,7 @@ class AuthenticationServiceImpl implements AuthenticationService {
         repository.revokeAllSessions(user.id(), now);
     }
 
+    /** Contrasta los claims con la sesión y la cuenta actuales, y registra su actividad. */
     @Override
     @Transactional
     public AuthenticatedIdentity validateAccessSession(UUID userId, UUID sessionId, String tokenRole) {
@@ -170,6 +177,7 @@ class AuthenticationServiceImpl implements AuthenticationService {
         return new AuthenticatedIdentity(userId, sessionId, user.role(), user.hasPendingTerms());
     }
 
+    /** Comprueba pertenencia y caducidad sin exigir que la sesión siga sin revocar. */
     @Override
     @Transactional
     public AuthenticatedIdentity validateLogoutSession(UUID userId, UUID sessionId, String tokenRole) {
@@ -220,8 +228,8 @@ class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String refreshToken(UUID sessionId) {
-        // UUID prefix (37 characters including the separator) plus a 192-bit URL-safe value stays within BCrypt's
-        // 72-byte input limit while retaining more than enough entropy for a refresh credential.
+        // El UUID y el separador ocupan 37 caracteres; los 192 bits aleatorios se codifican en Base64 URL.
+        // El resultado queda dentro del límite de entrada de 72 bytes de BCrypt.
         byte[] random = new byte[24];
         RANDOM.nextBytes(random);
         return sessionId + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(random);
@@ -238,4 +246,9 @@ class AuthenticationServiceImpl implements AuthenticationService {
             throw new UnauthorizedException();
         }
     }
+
+    /** Conserva el intento fallido; los demás errores siguen revirtiendo la transacción completa. */
+    private static final class InvalidPasswordResetCodeException extends RuleViolationException {
+    }
+
 }

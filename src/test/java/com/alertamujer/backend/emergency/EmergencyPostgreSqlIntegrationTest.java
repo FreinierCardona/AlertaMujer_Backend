@@ -26,7 +26,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Validates HU-API-012 against the migrated PostgreSQL schemas and application grants. */
+/** Valida HU-API-012 contra los esquemas PostgreSQL migrados y los permisos de aplicación. */
 class EmergencyPostgreSqlIntegrationTest {
 
     @Test

@@ -15,6 +15,7 @@ import com.alertamujer.backend.identity.service.OtpEmailSender;
 import com.alertamujer.backend.identity.service.PhoneFirstRegistrationService;
 import com.alertamujer.backend.shared.config.SystemConfigurationValues;
 import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.RegistrationConflictException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,8 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Versioned public registration flow. The phone confirmation is explicitly a
- * controlled simulator: it neither sends nor reads an SMS.
+ * Flujo público versionado de registro. La confirmación telefónica es explícitamente un simulador
+ * controlado: no envía ni lee SMS.
  */
 @Service
 class PhoneFirstRegistrationServiceImpl implements PhoneFirstRegistrationService {
@@ -75,9 +76,8 @@ class PhoneFirstRegistrationServiceImpl implements PhoneFirstRegistrationService
         requirePhoneSimulator();
         String username = input.username().trim();
         String phone = input.phone().trim();
-        if (repository.existsPhoneFirstIdentityConflict(username, phone)) {
-            throw new RuleViolationException();
-        }
+        if (repository.existsPhoneFirstIdentityConflict(username, null)) throw new RegistrationConflictException("username");
+        if (repository.existsPhoneFirstIdentityConflict(null, phone)) throw new RegistrationConflictException("phone");
 
         Instant now = clock.instant();
         Instant requestExpiry = now.plusSeconds(configuration.otpTtlMinutes() * 60L);
@@ -94,7 +94,7 @@ class PhoneFirstRegistrationServiceImpl implements PhoneFirstRegistrationService
                     requestExpiry,
                     now);
         } catch (DataIntegrityViolationException exception) {
-            throw new RuleViolationException();
+            throw RegistrationConflictException.fromConstraint(exception);
         }
 
         RegistrationStageResponse issued = issuePhoneSimulatorCode(requestId, phone, now);
@@ -133,12 +133,12 @@ class PhoneFirstRegistrationServiceImpl implements PhoneFirstRegistrationService
         requireStage(request, RegistrationStage.PHONE_VERIFIED);
         String email = input.email().trim().toLowerCase(Locale.ROOT);
         if (repository.existsEmailConflictExceptRequest(request.id(), email)) {
-            throw new RuleViolationException();
+            throw new RegistrationConflictException("email");
         }
         try {
             repository.setV2Credentials(request.id(), email, passwordEncoder.encode(input.password()), now);
         } catch (DataIntegrityViolationException exception) {
-            throw new RuleViolationException();
+            throw RegistrationConflictException.fromConstraint(exception);
         }
         return issueEmailCode(request.id(), email, now);
     }
@@ -170,7 +170,7 @@ class PhoneFirstRegistrationServiceImpl implements PhoneFirstRegistrationService
                 repository.markRegistrationCompleted(request.id(), now);
                 return new RegistrationVerificationResponse("COMPLETED", userId);
             } catch (DataIntegrityViolationException exception) {
-                throw new RuleViolationException();
+                throw RegistrationConflictException.fromConstraint(exception);
             }
         }
         throw new RuleViolationException();

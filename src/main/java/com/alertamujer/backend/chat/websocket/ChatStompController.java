@@ -12,7 +12,10 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
-/** Thin STOMP endpoint: chat service persists first and its after-commit listener publishes. */
+/**
+ * Punto de entrada STOMP: el servicio persiste el mensaje y su receptor de eventos lo publica después
+ * de confirmar la transacción.
+ */
 @Controller
 public class ChatStompController {
     private final ChatService service;

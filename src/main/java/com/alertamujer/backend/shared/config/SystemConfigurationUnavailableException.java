@@ -1,6 +1,6 @@
 package com.alertamujer.backend.shared.config;
 
-/** Safe startup failure that does not disclose connection or database details. */
+/** Fallo seguro de inicio que no revela detalles de conexión ni de la base de datos. */
 class SystemConfigurationUnavailableException extends IllegalStateException {
 
     SystemConfigurationUnavailableException() {

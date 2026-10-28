@@ -4,7 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 
 /**
- * Gives the shared HTTP components access to the correlation identifier of a request.
+ * Permite que los componentes HTTP compartidos accedan al identificador de correlación de una
+ * solicitud.
  */
 public final class RequestIdContext {
 

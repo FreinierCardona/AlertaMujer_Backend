@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Exposes the owner's finalized SOS history without adding administrative queries. */
+/** Expone el historial de SOS finalizados del propietario sin agregar consultas administrativas. */
 @RestController
 @RequestMapping("/api/v1/me/emergencies")
 public class OwnEmergencyHistoryController {
