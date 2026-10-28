@@ -73,6 +73,12 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.CONFLICT, "STATE_CONFLICT", "The requested operation conflicts with the current state.", request);
     }
 
+    @ExceptionHandler(RegistrationConflictException.class)
+    public ResponseEntity<ApiError> handleRegistrationConflict(RegistrationConflictException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNPROCESSABLE_CONTENT, "REGISTRATION_DUPLICATE", exception.fieldMessage(), request,
+                List.of(new ApiFieldError(exception.field(), exception.fieldMessage())));
+    }
+
     @ExceptionHandler(RuleViolationException.class)
     public ResponseEntity<ApiError> handleRuleViolation(RuleViolationException exception, HttpServletRequest request) {
         return response(HttpStatus.UNPROCESSABLE_CONTENT, "RULE_VIOLATION", "The request does not satisfy a business rule.", request);

@@ -11,8 +11,9 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 /**
- * Authentication queries use only the columns granted to {@code alertamujer_app}.
- * Password and refresh hashes are read exclusively through PostgreSQL's scoped functions.
+ * Las consultas de autenticación usan solo las columnas autorizadas para {@code alertamujer_app}. Los
+ * hashes de contraseña y renovación se leen exclusivamente mediante funciones PostgreSQL de alcance
+ * restringido.
  */
 @Repository
 public class IdentityAuthenticationRepository {
@@ -23,7 +24,7 @@ public class IdentityAuthenticationRepository {
         this.jdbc = jdbc;
     }
 
-    // Login: load only public account state, then read the password through its protected function.
+    // Inicio de sesión: carga solo el estado público de la cuenta y lee la contraseña mediante su función protegida.
     public Optional<UserAccount> findUserByIdentifier(String identifier) {
         return single("""
                 select user_id,
@@ -85,7 +86,7 @@ public class IdentityAuthenticationRepository {
                 userId);
     }
 
-    // Session lifecycle: the clear refresh credential never appears in a table query.
+    // Ciclo de vida de la sesión: la credencial de renovación en texto plano nunca aparece en consultas de tablas.
     public void createSession(UUID sessionId, UUID userId, String refreshTokenHash, String clientType,
             Instant expiresAt, Instant now) {
         jdbc.update("""
@@ -183,7 +184,7 @@ public class IdentityAuthenticationRepository {
                 """, Timestamp.from(now), userId);
     }
 
-    // Password change and recovery: obtain both secrets only from scoped database functions.
+    // Cambio y recuperación de contraseña: obtiene ambos secretos solo mediante funciones de base de datos de alcance restringido.
     public void updatePassword(UUID userId, String passwordHash, Instant now) {
         jdbc.update("""
                 update identity.user_credentials

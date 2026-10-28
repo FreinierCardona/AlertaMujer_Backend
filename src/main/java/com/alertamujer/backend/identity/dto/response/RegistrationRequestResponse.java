@@ -2,6 +2,6 @@ package com.alertamujer.backend.identity.dto.response;
 
 import java.util.UUID;
 
-/** Safe representation of a pending registration request. */
+/** Representación segura de una solicitud de registro pendiente. */
 public record RegistrationRequestResponse(UUID registrationRequestId, String status) {
 }

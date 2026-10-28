@@ -3,6 +3,6 @@ package com.alertamujer.backend.identity.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** A personal SOS message. The service persists its trimmed representation. */
+/** Mensaje SOS personal. El servicio lo guarda sin espacios al inicio ni al final. */
 public record SosMessageInput(@NotBlank @Size(max = 500) String message) {
 }

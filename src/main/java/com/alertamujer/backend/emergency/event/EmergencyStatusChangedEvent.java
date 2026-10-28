@@ -3,5 +3,5 @@ package com.alertamujer.backend.emergency.event;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Persisted SOS transition that can be announced only after its transaction commits. */
+/** Transición SOS persistida que solo puede anunciarse después de confirmar su transacción. */
 public record EmergencyStatusChangedEvent(UUID emergencyId, String status, Instant occurredAt) { }

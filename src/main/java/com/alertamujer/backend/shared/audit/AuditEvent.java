@@ -3,7 +3,7 @@ package com.alertamujer.backend.shared.audit;
 import java.util.Map;
 import java.util.UUID;
 
-/** A deliberately small, sanitized event accepted by the immutable audit log. */
+/** Evento deliberadamente pequeño y depurado que admite el registro de auditoría inmutable. */
 public record AuditEvent(
         UUID actorUserId,
         UUID subjectUserId,

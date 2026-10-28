@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Data an ENTITY_ADMIN may use to initiate a USER registration request. */
+/** Datos que un ENTITY_ADMIN puede usar para iniciar una solicitud de registro de un USER. */
 public record AdminRegistrationRequestInput(
         @NotBlank @Pattern(regexp = "^@[a-z0-9](?:[a-z0-9_]{1,18}[a-z0-9])$",
                 message = "must be @ followed by 3 to 20 lowercase letters, numbers or underscores")

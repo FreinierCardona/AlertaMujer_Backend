@@ -8,7 +8,7 @@ import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import com.alertamujer.backend.shared.validation.PageResponse;
 import java.util.UUID;
 
-/** SOS creation/recovery and reads established by HU-API-012. */
+/** Creación, recuperación y consulta de SOS establecidas por HU-API-012. */
 public interface EmergencyService {
     CreationResult createOrRecover(AuthenticatedIdentity identity, EmergencyCreateInput input);
     EmergencyResponse active(AuthenticatedIdentity identity);
@@ -18,10 +18,10 @@ public interface EmergencyService {
     void finish(AuthenticatedIdentity identity, UUID emergencyId);
     PageResponse<EmergencyResponse> ownHistory(AuthenticatedIdentity identity, int page, int size);
 
-    /** Called by the administration module in HU-API-017; it owns neither the route nor audit logging. */
+    /** Invocado por el módulo de administración en HU-API-017; no gestiona la ruta ni el registro de auditoría. */
     boolean startAttention(AuthenticatedIdentity identity, UUID emergencyId);
 
-    /** Called by the HU-API-018 scheduler after it has selected a possible timeout candidate. */
+    /** Invocado por el planificador de HU-API-018 tras seleccionar un posible candidato por tiempo de espera agotado. */
     void markOfflineIfTimedOut(UUID emergencyId);
 
     record CreationResult(EmergencyResponse emergency, boolean created) { }

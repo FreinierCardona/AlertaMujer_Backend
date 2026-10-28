@@ -1,6 +1,6 @@
 package com.alertamujer.backend.identity.model;
 
-/** Origin recorded for a pending registration request. */
+/** Origen registrado de una solicitud de registro pendiente. */
 public enum AccountOrigin {
     SELF_REGISTERED,
     ADMIN_CREATED

@@ -24,7 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Implements the OTP lifecycle documented for identity without adding state outside PostgreSQL. */
+/** Implementa el ciclo de vida OTP documentado para identidad sin agregar estado fuera de PostgreSQL. */
 @Service
 class OtpServiceImpl implements OtpService {
 
@@ -102,7 +102,7 @@ class OtpServiceImpl implements OtpService {
             repository.markRegistrationCompleted(request.id(), now);
             return new RegistrationVerificationResponse("COMPLETED", userId);
         } catch (DataIntegrityViolationException exception) {
-            // Unique constraints are the final guard against a concurrent identity change.
+            // Las restricciones de unicidad son la protección final frente a un cambio concurrente de identidad.
             throw new RuleViolationException();
         }
     }
@@ -113,7 +113,7 @@ class OtpServiceImpl implements OtpService {
         String destination = email.trim().toLowerCase(Locale.ROOT);
         UserData user = repository.lockUserByEmail(destination).orElse(null);
         if (user == null) {
-            return; // The public contract must not disclose whether the account exists.
+            return; // El contrato público no debe revelar si la cuenta existe.
         }
         Instant now = clock.instant();
         issueUserCode(user, OtpPurpose.PASSWORD_RESET, OtpChannel.EMAIL, destination, now);
@@ -140,7 +140,7 @@ class OtpServiceImpl implements OtpService {
         return new OtpIssuedResponse(expiresAt, channel == OtpChannel.SMS ? code : null);
     }
 
-    /** Reused by recovery now and by the authenticated contact-change HU later. */
+    /** Se reutiliza ahora en recuperación y posteriormente en la HU de cambio autenticado de datos de contacto. */
     private void issueUserCode(UserData user, OtpPurpose purpose, OtpChannel channel, String destination, Instant now) {
         int resendNumber = nextResendNumber(repository.lockLatestUserCode(user.id(), purpose, channel, destination), now);
         repository.invalidateActiveUserCodes(user.id(), purpose, channel, destination, now);

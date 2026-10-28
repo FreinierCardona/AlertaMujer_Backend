@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Writes the common API error when Spring Security rejects a request before it
- * reaches a controller advice.
+ * Escribe el error común de la API cuando Spring Security rechaza una solicitud antes de que llegue al
+ * manejador de excepciones de los controladores.
  */
 @Component
 public class SecurityErrorResponseWriter {

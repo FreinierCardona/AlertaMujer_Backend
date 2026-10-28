@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Runs the SOS timeout in small batches; the service owns the state transition. */
+/** Comprueba la falta de actividad de los SOS en lotes pequeños; el servicio gestiona la transición de estado. */
 @Component
 class EmergencyTimeoutScheduler {
     private static final Logger LOGGER = LoggerFactory.getLogger(EmergencyTimeoutScheduler.class);

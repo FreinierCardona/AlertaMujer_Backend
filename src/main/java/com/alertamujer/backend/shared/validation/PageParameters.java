@@ -4,8 +4,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 /**
- * Reusable query parameters for paginated REST endpoints. Controllers should
- * receive it as {@code @Valid PageParameters} before calling a service.
+ * Parámetros de consulta reutilizables para rutas REST paginadas. Los controladores deben recibirlos
+ * como {@code @Valid PageParameters} antes de invocar un servicio.
  */
 public class PageParameters {
 

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** REST recovery endpoint; STOMP is the only write transport for emergency chat. */
+/** Ruta REST para recuperar mensajes; STOMP es el único transporte de escritura del chat de emergencia. */
 @RestController
 @Validated
 @RequestMapping("/api/v1/emergencies/{emergencyId}/messages")

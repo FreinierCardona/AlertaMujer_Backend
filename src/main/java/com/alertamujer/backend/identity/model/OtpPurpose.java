@@ -1,6 +1,6 @@
 package com.alertamujer.backend.identity.model;
 
-/** Purposes constrained by the deployed PostgreSQL schema. */
+/** Propósitos limitados por el esquema PostgreSQL desplegado. */
 public enum OtpPurpose {
     PASSWORD_RESET,
     PHONE_VERIFICATION,

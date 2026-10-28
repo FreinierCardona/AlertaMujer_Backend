@@ -17,7 +17,10 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Exercises administrative status/audit behavior against the migrated application role when supplied. */
+/**
+ * Prueba el comportamiento administrativo de estados y auditoría con el rol de aplicación migrado
+ * cuando se proporciona.
+ */
 class AdministrationPostgreSqlIntegrationTest {
 
     @Test

@@ -9,7 +9,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 
-/** Read-only contact-panel operations defined by HU-API-022. */
+/** Operaciones de solo lectura del panel de contactos definidas por HU-API-022. */
 public interface ContactAlertService {
     PageResponse<ContactAlertResponse> list(AuthenticatedIdentity identity, int page, int size);
     ContactAlertDetailResponse detail(AuthenticatedIdentity identity, UUID emergencyId);

@@ -5,7 +5,7 @@ import com.alertamujer.backend.identity.dto.response.RegistrationVerificationRes
 import com.alertamujer.backend.identity.model.OtpChannel;
 import java.util.UUID;
 
-/** Coordinates OTP lifecycle operations; HTTP and SMTP remain adapters. */
+/** Coordina el ciclo de vida de los OTP; HTTP y SMTP siguen siendo adaptadores. */
 public interface OtpService {
 
     OtpIssuedResponse issueRegistrationCode(UUID registrationRequestId, OtpChannel channel);

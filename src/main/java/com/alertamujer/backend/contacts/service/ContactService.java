@@ -8,7 +8,7 @@ import com.alertamujer.backend.contacts.dto.response.PageResponse;
 import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.util.UUID;
 
-/** Contact directory and consented-relationship use cases from HU-API-011. */
+/** Casos de uso del directorio de contactos y las relaciones consentidas de HU-API-011. */
 public interface ContactService {
     PageResponse<DirectoryUserResponse> directory(AuthenticatedIdentity identity, String query, int page, int size);
     InvitationResult invite(AuthenticatedIdentity identity, ContactInvitationInput input);

@@ -21,7 +21,7 @@ services:
       SMTP_AUTH: ${SMTP_AUTH:?SMTP_AUTH is required in .env}
       SMTP_STARTTLS: ${SMTP_STARTTLS:?SMTP_STARTTLS is required in .env}
       SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is required in .env}
-      IDENTITY_PHONE_SIMULATOR_ENABLED: ${IDENTITY_PHONE_SIMULATOR_ENABLED:-false}
+      IDENTITY_PHONE_SIMULATOR_ENABLED: ${IDENTITY_PHONE_SIMULATOR_ENABLED:-true}
     ports:
       - "${BACKEND_HOST_PORT:?BACKEND_HOST_PORT is required in .env}:8080"
     volumes:

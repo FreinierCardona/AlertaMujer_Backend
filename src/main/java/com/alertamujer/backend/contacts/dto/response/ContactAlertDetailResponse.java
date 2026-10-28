@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Read-only detail deliberately limited to information needed by an emergency contact. */
+/** Detalle de solo lectura limitado a la información necesaria para un contacto de emergencia. */
 public record ContactAlertDetailResponse(UUID emergencyId, String status, String userDisplayName, Instant startedAt,
         String messageSnapshot, LastConfirmedLocation lastConfirmedLocation, List<EvidenceResponse> evidences) {
     public record LastConfirmedLocation(BigDecimal latitude, BigDecimal longitude, Instant capturedAt) { }

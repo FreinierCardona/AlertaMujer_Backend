@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Runs the documented bounded temporary-data cleanup once per UTC hour. */
+/** Ejecuta una vez por hora UTC la limpieza limitada de datos temporales documentada. */
 @Component
 class IdentityOtpPurgeScheduler {
     private static final Logger LOGGER = LoggerFactory.getLogger(IdentityOtpPurgeScheduler.class);

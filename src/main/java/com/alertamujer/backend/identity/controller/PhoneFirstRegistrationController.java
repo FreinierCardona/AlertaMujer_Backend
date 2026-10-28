@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** HTTP adapter for the public v2 phone-first registration contract. */
+/** Adaptador HTTP del contrato público v2 de registro que comienza por el teléfono. */
 @RestController
 @RequestMapping("/api/v2/registration-requests")
 public class PhoneFirstRegistrationController {

@@ -35,7 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Owns only profile state; contact secrets stay in the existing restricted OTP storage. */
+/**
+ * Gestiona únicamente el estado del perfil; los secretos de contacto permanecen en el almacenamiento
+ * OTP restringido existente.
+ */
 @Service
 class ProfileServiceImpl implements ProfileService {
     private static final SecureRandom RANDOM = new SecureRandom();

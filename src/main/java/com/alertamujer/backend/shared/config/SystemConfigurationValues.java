@@ -1,8 +1,8 @@
 package com.alertamujer.backend.shared.config;
 
 /**
- * Immutable operational values loaded once from the database release.
- * Future module services inject this type instead of duplicating limits.
+ * Valores operativos inmutables cargados una sola vez desde la versión de base de datos. Los futuros
+ * servicios de módulos inyectan este tipo en lugar de duplicar los límites.
  */
 public record SystemConfigurationValues(
         String defaultSosMessage,

@@ -48,10 +48,14 @@ class StompAuthenticationInterceptorTest {
         when(authentication.validateAccessSession(identity.userId(), identity.sessionId(), "USER")).thenReturn(identity);
         StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.CONNECT);
         headers.setNativeHeader("Authorization", "Bearer access-token");
+        headers.setLeaveMutable(true);
+        java.util.concurrent.atomic.AtomicReference<java.security.Principal> sessionUser = new java.util.concurrent.atomic.AtomicReference<>();
+        headers.setUserChangeCallback(sessionUser::set);
 
         Message<?> result = interceptor.preSend(MessageBuilder.createMessage(new byte[0], headers.getMessageHeaders()), null);
 
         assertThat(StompHeaderAccessor.wrap(result).getUser()).isInstanceOf(IdentityAuthentication.class);
+        assertThat(sessionUser.get()).isSameAs(StompHeaderAccessor.wrap(result).getUser());
         verify(authentication).validateAccessSession(identity.userId(), identity.sessionId(), "USER");
     }
 

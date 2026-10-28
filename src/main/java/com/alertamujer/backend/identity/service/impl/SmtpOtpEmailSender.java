@@ -9,7 +9,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
-/** SMTP implementation for the email channel. Credentials stay in the environment. */
+/** Implementación SMTP del canal de correo. Las credenciales permanecen en el entorno. */
 @Component
 class SmtpOtpEmailSender implements OtpEmailSender {
 

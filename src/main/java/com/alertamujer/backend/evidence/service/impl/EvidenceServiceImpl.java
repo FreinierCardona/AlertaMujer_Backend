@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Coordinates one local file and one metadata row, compensating the file when insertion fails. */
+/** Coordina el archivo privado y sus metadatos; intenta retirar el archivo si falla la persistencia. */
 @Service
 class EvidenceServiceImpl implements EvidenceService {
     private final EvidenceRepository repository;
@@ -42,14 +42,18 @@ class EvidenceServiceImpl implements EvidenceService {
 
     EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration,
             AuditService auditService, Clock clock) {
-        this.repository = repository; this.storage = storage; this.configuration = configuration;
-        this.auditService = auditService; this.clock = clock;
+        this.repository = repository;
+        this.storage = storage;
+        this.configuration = configuration;
+        this.auditService = auditService;
+        this.clock = clock;
     }
 
     @Override
     @Transactional
     public EvidenceResponse upload(AuthenticatedIdentity identity, UUID emergencyId, MultipartFile file) {
         requireUser(identity);
+        // El bloqueo serializa las cargas de la misma emergencia antes de asignar el siguiente número.
         var emergency = repository.lockOwnedEnabledEmergency(emergencyId, identity.userId())
                 .orElseThrow(ResourceNotFoundException::new);
         if (!isOperational(emergency.status())) throw new StateConflictException();
@@ -85,6 +89,7 @@ class EvidenceServiceImpl implements EvidenceService {
         return evidence;
     }
 
+    /** Abre el contenido privado solo tras verificar el acceso a los metadatos. */
     @Override
     @Transactional
     public EvidenceContent content(AuthenticatedIdentity identity, UUID evidenceId) {
@@ -102,6 +107,7 @@ class EvidenceServiceImpl implements EvidenceService {
         }
     }
 
+    /** Deja un margen de 24 horas antes de retirar archivos sin referencia en la base de datos. */
     @Override
     @Transactional(readOnly = true)
     public int reconcileOrphans() {
@@ -131,6 +137,7 @@ class EvidenceServiceImpl implements EvidenceService {
         }
     }
 
+    // Conserva solo el nombre final y limita su longitud; nunca lo utiliza como ruta de almacenamiento.
     private String safeOriginalName(MultipartFile file) {
         String name = file.getOriginalFilename();
         if (name == null || name.isBlank()) return null;

@@ -27,7 +27,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Keeps the SOS root, its first location and its initial history event atomic. */
+/** Mantiene la emergencia, la primera ubicación y el historial inicial en una sola transacción. */
 @Service
 class EmergencyServiceImpl implements EmergencyService {
 
@@ -61,6 +61,7 @@ class EmergencyServiceImpl implements EmergencyService {
         this.auditService = auditService;
     }
 
+    /** Devuelve la emergencia abierta existente o crea una nueva e indica si hubo creación. */
     @Override
     @Transactional
     public CreationResult createOrRecover(AuthenticatedIdentity identity, EmergencyCreateInput input) {
@@ -77,6 +78,7 @@ class EmergencyServiceImpl implements EmergencyService {
         String message = effectiveMessage(userId, input.message());
         Instant now = clock.instant();
         UUID emergencyId = UUID.randomUUID();
+        // Si otra solicitud creó la emergencia, recupera la fila protegida por la unicidad en PostgreSQL.
         if (!repository.insertActiveEmergency(emergencyId, userId, message, now)) {
             EmergencyData recovered = repository.findOpenEmergency(userId, true).orElseThrow(RuleViolationException::new);
             return new CreationResult(response(recovered), false);
@@ -95,6 +97,7 @@ class EmergencyServiceImpl implements EmergencyService {
         return repository.findOpenEmergency(userId, false).map(this::response).orElseThrow(ResourceNotFoundException::new);
     }
 
+    /** Distingue el acceso del propietario del acceso administrativo, que deja registro de auditoría. */
     @Override
     @Transactional
     public EmergencyDetailResponse ownEmergency(AuthenticatedIdentity identity, UUID emergencyId) {
@@ -105,7 +108,10 @@ class EmergencyServiceImpl implements EmergencyService {
             UUID ownerUserId = repository.findEmergencyOwner(emergencyId).orElseThrow(ResourceNotFoundException::new);
             auditService.record(AuditEvent.success(identity.userId(), ownerUserId, "ALERT_VIEWED", "EMERGENCY", emergencyId,
                     null, null, "Administrative emergency detail viewed."));
-            return detailResponse(emergency);
+            EmergencyDetailResponse detail = detailResponse(emergency);
+            return new EmergencyDetailResponse(detail.emergencyId(), detail.status(), detail.previousOperationalStatus(),
+                    detail.startedAt(), detail.lastHeartbeatAt(), detail.finalizedAt(), detail.messageSnapshot(),
+                    detail.lastConfirmedLocation(), repository.findOwnerIdentity(emergencyId).orElse(null));
         }
         UUID userId = requireEnabledUser(identity, false);
         return repository.findOwnEmergencyDetail(emergencyId, userId).map(this::detailResponse)
@@ -123,6 +129,7 @@ class EmergencyServiceImpl implements EmergencyService {
         }
         Instant now = clock.instant();
         repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(), now);
+        // Un heartbeat restaura el estado operativo que se conservó al perder conectividad.
         if ("OFFLINE".equals(emergency.status())) {
             transition(emergency, emergency.previousOperationalStatus(), null, userId, now, true);
         } else {
@@ -166,6 +173,7 @@ class EmergencyServiceImpl implements EmergencyService {
                 .map(this::response).toList(), page, size, repository.countOwnFinalizedEmergencies(userId));
     }
 
+    /** Devuelve false si ya estaba en atención; solo una alerta activa admite esta transición. */
     @Override
     @Transactional
     public boolean startAttention(AuthenticatedIdentity identity, UUID emergencyId) {
@@ -184,6 +192,7 @@ class EmergencyServiceImpl implements EmergencyService {
         return true;
     }
 
+    /** Revalida estado y último heartbeat bajo bloqueo antes de marcar una alerta sin conexión. */
     @Override
     @Transactional
     public void markOfflineIfTimedOut(UUID emergencyId) {
@@ -208,6 +217,7 @@ class EmergencyServiceImpl implements EmergencyService {
                 .orElseThrow(ForbiddenException::new);
     }
 
+    // Prioriza el texto recibido, luego la preferencia personal y finalmente el mensaje global.
     private String effectiveMessage(UUID userId, String requestedMessage) {
         if (requestedMessage != null) {
             String normalized = requestedMessage.trim();
@@ -233,7 +243,7 @@ class EmergencyServiceImpl implements EmergencyService {
                 emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt(), emergency.messageSnapshot(), location);
     }
 
-    /** All lifecycle writers arrive here after locking the root emergency row. */
+    /** Actualiza estado e historial con la fila de emergencia previamente bloqueada. */
     private void transition(EmergencyData emergency, String nextStatus, String previousOperationalStatus,
             UUID actorUserId, Instant now, boolean updateHeartbeat) {
         if (nextStatus.equals(emergency.status())) {

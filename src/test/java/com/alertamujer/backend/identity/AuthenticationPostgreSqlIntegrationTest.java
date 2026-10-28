@@ -21,7 +21,10 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Exercises the session grants and protected refresh-hash function against a supplied migrated database. */
+/**
+ * Prueba los permisos de sesión y la función protegida del hash de renovación contra una base migrada
+ * proporcionada.
+ */
 class AuthenticationPostgreSqlIntegrationTest {
 
     @Test

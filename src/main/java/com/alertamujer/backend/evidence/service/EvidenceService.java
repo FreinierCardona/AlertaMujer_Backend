@@ -7,13 +7,13 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Application operations for photographic evidence only. */
+/** Operaciones de aplicación exclusivamente para evidencias fotográficas. */
 public interface EvidenceService {
     EvidenceResponse upload(AuthenticatedIdentity identity, UUID emergencyId, MultipartFile file);
     List<EvidenceResponse> list(AuthenticatedIdentity identity, UUID emergencyId);
     EvidenceContent content(AuthenticatedIdentity identity, UUID evidenceId);
 
-    /** Called by the future HU-API-018 hourly scheduler; it is intentionally not an HTTP operation. */
+    /** Invocado por el futuro planificador horario de HU-API-018; no es una operación HTTP. */
     int reconcileOrphans();
 
     record EvidenceContent(InputStream stream, long length) { }

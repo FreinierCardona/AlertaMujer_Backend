@@ -18,7 +18,10 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Exercises HU-API-016 with the deployed PostgreSQL table and application-table grants when credentials are supplied. */
+/**
+ * Prueba HU-API-016 con la tabla PostgreSQL desplegada y los permisos de aplicación cuando se
+ * proporcionan credenciales.
+ */
 class ChatPostgreSqlIntegrationTest {
     @Test
     void persistsOnceOrdersByServerIdAndAllowsRecoveryAfterFinalization() {

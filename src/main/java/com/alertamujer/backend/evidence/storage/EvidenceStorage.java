@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Storage boundary for this module only; it deliberately is not a generic file service. */
+/** Interfaz de almacenamiento exclusiva de este módulo; no es un servicio genérico de archivos. */
 public interface EvidenceStorage {
     StoredEvidenceFile store(MultipartFile source) throws IOException;
     InputStream open(String reference) throws IOException;

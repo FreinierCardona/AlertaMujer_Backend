@@ -10,9 +10,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Read queries for the contact panel. Every individual resource query uses the
- * same relationship predicate so an unauthorized caller cannot distinguish a
- * missing resource from a resource it may not read.
+ * Consultas de lectura del panel de contactos. Cada consulta de un recurso individual usa la misma
+ * condición de relación para impedir que una persona sin autorización distinga un recurso inexistente
+ * de uno que no puede leer.
  */
 @Repository
 public class ContactAlertRepository {
