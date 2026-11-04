@@ -56,9 +56,11 @@ class EvidenceServiceImpl implements EvidenceService {
         // El bloqueo serializa las cargas de la misma emergencia antes de asignar el siguiente número.
         var emergency = repository.lockOwnedEnabledEmergency(emergencyId, identity.userId())
                 .orElseThrow(ResourceNotFoundException::new);
-        if (!isOperational(emergency.status())) throw new StateConflictException();
+        if (!isOperational(emergency.status()) && !"OFFLINE".equals(emergency.status())) throw new StateConflictException();
         int sequence = repository.nextSequence(emergencyId);
-        if (sequence > configuration.maxEvidenceCount()) throw new RuleViolationException();
+        if (configuration.maxEvidenceCount() > 0 && sequence > configuration.maxEvidenceCount()) {
+            throw new RuleViolationException();
+        }
 
         StoredEvidenceFile stored = null;
         try {

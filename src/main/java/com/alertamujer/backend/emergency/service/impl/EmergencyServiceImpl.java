@@ -128,7 +128,9 @@ class EmergencyServiceImpl implements EmergencyService {
             throw new StateConflictException();
         }
         Instant now = clock.instant();
-        repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(), now);
+        if (input != null) {
+            repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(), now);
+        }
         // Un heartbeat restaura el estado operativo que se conservó al perder conectividad.
         if ("OFFLINE".equals(emergency.status())) {
             transition(emergency, emergency.previousOperationalStatus(), null, userId, now, true);

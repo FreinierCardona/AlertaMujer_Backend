@@ -161,6 +161,18 @@ class EmergencyServiceImplTest {
     }
 
     @Test
+    void heartbeatWithoutLocationRecoversOfflineWithoutWritingLocation() {
+        UUID emergencyId = UUID.randomUUID();
+        EmergencyData offline = new EmergencyData(emergencyId, "OFFLINE", "IN_PROGRESS", now.minusSeconds(300),
+                now.minusSeconds(200), null);
+        when(repository.lockOwnEmergency(emergencyId, userId)).thenReturn(Optional.of(offline));
+        when(repository.nextHistorySequence(emergencyId)).thenReturn(3);
+        service.heartbeat(identity, emergencyId, null);
+        verify(repository).updateHeartbeat(emergencyId, "IN_PROGRESS", null, now);
+        verify(repository, never()).insertLocation(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void finalizedEmergencyRejectsNewLocationsAndNoLocationIsWritten() {
         UUID emergencyId = UUID.randomUUID();
         EmergencyData finalized = new EmergencyData(emergencyId, "FINALIZED", null, now.minusSeconds(300), now, now);
