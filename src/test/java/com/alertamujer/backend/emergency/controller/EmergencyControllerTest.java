@@ -100,6 +100,14 @@ class EmergencyControllerTest {
     }
 
     @Test
+    void acceptsHeartbeatWithoutLocation() throws Exception {
+        UUID emergencyId = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/emergencies/{emergencyId}/heartbeats", emergencyId))
+                .andExpect(status().isNoContent());
+        verify(service).heartbeat(any(), org.mockito.ArgumentMatchers.eq(emergencyId), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
     void returnsAuthorizedDetailWithTheSnapshotAndLastConfirmedLocation() throws Exception {
         UUID emergencyId = UUID.randomUUID();
         EmergencyDetailResponse detail = new EmergencyDetailResponse(emergencyId, "ACTIVE", null,

@@ -50,7 +50,7 @@ public class EmergencyController {
 
     @PostMapping("/{emergencyId}/heartbeats")
     public ResponseEntity<Void> heartbeat(@AuthenticationPrincipal AuthenticatedIdentity identity, @PathVariable UUID emergencyId,
-            @Valid @RequestBody LocationInput input) {
+            @Valid @RequestBody(required = false) LocationInput input) {
         emergencyService.heartbeat(identity, emergencyId, input);
         return ResponseEntity.noContent().build();
     }

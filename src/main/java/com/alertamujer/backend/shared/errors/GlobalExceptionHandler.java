@@ -1,6 +1,7 @@
 package com.alertamujer.backend.shared.errors;
 
 import com.alertamujer.backend.shared.observability.RequestIdContext;
+import com.alertamujer.backend.evidence.storage.EvidenceStorageConfigurationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -87,6 +88,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiError> handleBadRequest(BadRequestException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "The request is invalid.", request);
+    }
+
+    @ExceptionHandler(EvidenceStorageConfigurationException.class)
+    public ResponseEntity<ApiError> handleEvidenceStorageConfiguration(
+            EvidenceStorageConfigurationException exception, HttpServletRequest request) {
+        LOGGER.error("Evidence storage is unavailable. requestId={}", RequestIdContext.getRequestId(request));
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "EVIDENCE_STORAGE_UNAVAILABLE",
+                "Evidence storage is unavailable.", request);
     }
 
     @ExceptionHandler(Exception.class)

@@ -46,7 +46,11 @@ class LocalEvidenceStorage implements EvidenceStorage {
         byte[] webp = source == null ? null : source.getBytes();
         validateSource(source, webp);
         Path root = configuredRoot();
-        Files.createDirectories(root);
+        try {
+            Files.createDirectories(root);
+        } catch (IOException exception) {
+            throw new EvidenceStorageConfigurationException("Evidence storage is not writable.", exception);
+        }
         String reference = UUID.randomUUID() + ".webp";
         // Escribe primero un archivo temporal para no exponer una evidencia parcialmente guardada.
         Path temporary = root.resolve("." + UUID.randomUUID() + ".tmp");
@@ -85,7 +89,7 @@ class LocalEvidenceStorage implements EvidenceStorage {
         Path root;
         try {
             root = configuredRoot();
-        } catch (IOException exception) {
+        } catch (EvidenceStorageConfigurationException exception) {
             LOGGER.warn("Evidence reconciliation deferred: storage is not configured.");
             return 0;
         }
@@ -149,9 +153,15 @@ class LocalEvidenceStorage implements EvidenceStorage {
         return imageChunkFound && offset == bytes.length;
     }
 
-    private Path configuredRoot() throws IOException {
-        if (storagePath == null || storagePath.isBlank()) throw new IOException("Evidence storage is not configured");
-        return Path.of(storagePath).toAbsolutePath().normalize();
+    private Path configuredRoot() {
+        if (storagePath == null || storagePath.isBlank()) {
+            throw new EvidenceStorageConfigurationException("Evidence storage is not configured.");
+        }
+        try {
+            return Path.of(storagePath).toAbsolutePath().normalize();
+        } catch (RuntimeException exception) {
+            throw new EvidenceStorageConfigurationException("Evidence storage path is invalid.", exception);
+        }
     }
 
     // Acepta únicamente referencias internas y comprueba que la ruta permanezca dentro del almacén.
