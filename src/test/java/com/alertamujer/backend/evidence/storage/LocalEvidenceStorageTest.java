@@ -44,6 +44,15 @@ class LocalEvidenceStorageTest {
     }
 
     @Test
+    void reportsMissingStorageConfigurationExplicitly() throws Exception {
+        LocalEvidenceStorage storage = new LocalEvidenceStorage("", 500_000);
+
+        assertThatThrownBy(() -> storage.store(webpImage()))
+                .isInstanceOf(EvidenceStorageConfigurationException.class)
+                .hasMessage("Evidence storage is not configured.");
+    }
+
+    @Test
     void rejectsOneByteDeclaredWebpBeforeCreatingAFile() {
         LocalEvidenceStorage storage = storage();
         MockMultipartFile file = new MockMultipartFile("file", "camera.webp", "image/webp", new byte[] {1});

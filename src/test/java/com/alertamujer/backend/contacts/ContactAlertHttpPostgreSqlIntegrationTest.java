@@ -3,22 +3,29 @@ package com.alertamujer.backend.contacts;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.alertamujer.AlertaMujerApplication;
+import com.alertamujer.backend.evidence.service.EvidenceService;
+import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -28,14 +35,13 @@ class ContactAlertHttpPostgreSqlIntegrationTest {
     private static final String PASSWORD = "SecurePass#2026";
 
     @Test
-    void exposesOnlyAnAcceptedContactsOpenEmergencyAndRevokesItAfterFinalization() throws Exception {
+    void deliversUploadedEvidenceToAnAdministratorAndAnAcceptedContactUntilFinalization() throws Exception {
         String url = System.getenv("SPRING_DATASOURCE_URL");
         String username = System.getenv("SPRING_DATASOURCE_USERNAME");
         String password = System.getenv("SPRING_DATASOURCE_PASSWORD");
         Assumptions.assumeTrue(url != null && username != null && password != null,
                 "Integration database credentials were not supplied");
         Path storage = Files.createTempDirectory(Path.of("target"), "contact-alert-http-");
-        UUID evidence = UUID.randomUUID();
         SpringApplication application = new SpringApplication(AlertaMujerApplication.class);
         application.setWebApplicationType(WebApplicationType.SERVLET);
         application.setDefaultProperties(Map.of("spring.profiles.active", "test", "spring.datasource.url", url,
@@ -44,6 +50,7 @@ class ContactAlertHttpPostgreSqlIntegrationTest {
                 "spring.main.banner-mode", "off"));
         try (ConfigurableApplicationContext context = application.run("--evidence.storage-path=" + storage.toAbsolutePath())) {
             JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
+            EvidenceService evidenceService = context.getBean(EvidenceService.class);
             ObjectMapper json = context.getBean(ObjectMapper.class);
             PasswordEncoder encoder = context.getBean(PasswordEncoder.class);
             HttpClient client = HttpClient.newHttpClient();
@@ -76,13 +83,11 @@ class ContactAlertHttpPostgreSqlIntegrationTest {
                         insert into emergency.emergency_locations (location_id, emergency_id, latitude, longitude, captured_at, received_at)
                         values (?, ?, 4.609710, -74.081750, ?, ?)
                         """, UUID.randomUUID(), emergency, Timestamp.from(now), Timestamp.from(now));
-                String reference = evidence + ".webp";
-                Files.write(storage.resolve(reference), new byte[] {'R', 'I', 'F', 'F'});
-                jdbc.update("""
-                        insert into emergency.emergency_evidences (evidence_id, emergency_id, evidence_sequence, file_reference,
-                            original_file_name, mime_type, original_mime_type, file_size_bytes, received_at)
-                        values (?, ?, 1, ?, 'camera.webp', 'image/webp', 'image/webp', 4, ?)
-                        """, evidence, emergency, reference, Timestamp.from(now));
+                var uploaded = evidenceService.upload(new AuthenticatedIdentity(owner, UUID.randomUUID(), "USER", false),
+                        emergency, webpImage());
+                UUID evidence = uploaded.evidenceId();
+                assertThat(evidenceService.list(new AuthenticatedIdentity(UUID.randomUUID(), UUID.randomUUID(), "ENTITY_ADMIN", false),
+                        emergency)).extracting(item -> item.evidenceId()).containsExactly(evidence);
 
                 String contactToken = login(client, json, baseUrl, "contact-" + suffix + "@example.test");
                 String outsiderToken = login(client, json, baseUrl, "outside-" + suffix + "@example.test");
@@ -115,8 +120,19 @@ class ContactAlertHttpPostgreSqlIntegrationTest {
                 jdbc.update("delete from identity.users where user_id in (?, ?, ?)", owner, contact, outsider);
             }
         } finally {
-            Files.deleteIfExists(storage.resolve(evidence + ".webp"));
-            Files.deleteIfExists(storage);
+            deleteDirectory(storage);
+        }
+    }
+
+    private static MockMultipartFile webpImage() {
+        byte[] bytes = Base64.getDecoder().decode("UklGRkAAAABXRUJQVlA4IDQAAADwAQCdASoQABAAAMASJZwC7DBAAZB+E0AA/v/+TifOgrR8c9327nURIAASGk+ySVVmAAAA");
+        return new MockMultipartFile("file", "camera.webp", "image/webp", bytes);
+    }
+
+    private static void deleteDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) return;
+        try (Stream<Path> paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
         }
     }
 

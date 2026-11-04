@@ -50,10 +50,21 @@ class EvidenceServiceImplTest {
     }
 
     @Test
-    void refusesOfflineEmergencyBeforeWritingTheFile() throws Exception {
+    void acceptsEvidenceForAnOwnedOfflineEmergency() throws Exception {
         when(repository.lockOwnedEnabledEmergency(emergencyId, identity.userId()))
                 .thenReturn(Optional.of(new EvidenceRepository.EmergencyData(emergencyId, "OFFLINE")));
+        when(repository.nextSequence(emergencyId)).thenReturn(1);
+        when(storage.store(any())).thenReturn(new StoredEvidenceFile("00000000-0000-0000-0000-000000000001.webp", 42));
 
+        service.upload(identity, emergencyId, file());
+
+        verify(repository).insert(any(), eq(emergencyId), eq(1), any(), any(), any(), eq(42), any());
+    }
+
+    @Test
+    void refusesFinalizedEmergencyBeforeWritingTheFile() throws Exception {
+        when(repository.lockOwnedEnabledEmergency(emergencyId, identity.userId()))
+                .thenReturn(Optional.of(new EvidenceRepository.EmergencyData(emergencyId, "FINALIZED")));
         assertThatThrownBy(() -> service.upload(identity, emergencyId, file())).isInstanceOf(StateConflictException.class);
         verify(storage, never()).store(any());
     }

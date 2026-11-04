@@ -20,7 +20,7 @@ public record SystemConfigurationValues(
         if (defaultSosMessage == null || defaultSosMessage.isBlank()
                 || heartbeatIntervalSeconds <= 0
                 || offlineTimeoutSeconds <= heartbeatIntervalSeconds
-                || maxEvidenceCount <= 0
+                || maxEvidenceCount < 0
                 || maxEvidenceSizeBytes <= 0
                 || maxChatMessageLength <= 0
                 || otpTtlMinutes <= 0
