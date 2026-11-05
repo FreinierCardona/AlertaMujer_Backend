@@ -1,0 +1,268 @@
+package com.alertamujer.backend.emergency.service.impl;
+
+import com.alertamujer.backend.emergency.dto.request.EmergencyCreateInput;
+import com.alertamujer.backend.emergency.dto.request.LocationInput;
+import com.alertamujer.backend.emergency.dto.response.EmergencyDetailResponse;
+import com.alertamujer.backend.emergency.dto.response.EmergencyLocationResponse;
+import com.alertamujer.backend.emergency.dto.response.EmergencyResponse;
+import com.alertamujer.backend.emergency.event.EmergencyStatusChangedEvent;
+import com.alertamujer.backend.emergency.repository.EmergencyRepository;
+import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyData;
+import com.alertamujer.backend.emergency.repository.EmergencyRepository.EmergencyDetailData;
+import com.alertamujer.backend.emergency.service.EmergencyService;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.errors.ForbiddenException;
+import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
+import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.validation.PageResponse;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Mantiene la emergencia, la primera ubicación y el historial inicial en una sola transacción. */
+@Service
+class EmergencyServiceImpl implements EmergencyService {
+
+    private final EmergencyRepository repository;
+    private final SystemConfigurationValues configuration;
+    private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AuditService auditService;
+
+    @Autowired
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration,
+            ApplicationEventPublisher eventPublisher, AuditService auditService) {
+        this(repository, configuration, Clock.systemUTC(), eventPublisher, auditService);
+    }
+
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock) {
+        this(repository, configuration, clock, event -> { }, AuditService.noop());
+    }
+
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock,
+            ApplicationEventPublisher eventPublisher) {
+        this(repository, configuration, clock, eventPublisher, AuditService.noop());
+    }
+
+    EmergencyServiceImpl(EmergencyRepository repository, SystemConfigurationValues configuration, Clock clock,
+            ApplicationEventPublisher eventPublisher, AuditService auditService) {
+        this.repository = repository;
+        this.configuration = configuration;
+        this.clock = clock;
+        this.eventPublisher = eventPublisher;
+        this.auditService = auditService;
+    }
+
+    /** Devuelve la emergencia abierta existente o crea una nueva e indica si hubo creación. */
+    @Override
+    @Transactional
+    public CreationResult createOrRecover(AuthenticatedIdentity identity, EmergencyCreateInput input) {
+        UUID userId = requireEnabledUser(identity, true);
+        if (!repository.hasEligibleContact(userId)) {
+            throw new RuleViolationException();
+        }
+
+        EmergencyData existing = repository.findOpenEmergency(userId, true).orElse(null);
+        if (existing != null) {
+            return new CreationResult(response(existing), false);
+        }
+
+        String message = effectiveMessage(userId, input.message());
+        Instant now = clock.instant();
+        UUID emergencyId = UUID.randomUUID();
+        // Si otra solicitud creó la emergencia, recupera la fila protegida por la unicidad en PostgreSQL.
+        if (!repository.insertActiveEmergency(emergencyId, userId, message, now)) {
+            EmergencyData recovered = repository.findOpenEmergency(userId, true).orElseThrow(RuleViolationException::new);
+            return new CreationResult(response(recovered), false);
+        }
+        repository.insertInitialLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(),
+                input.capturedAt(), now);
+        repository.insertInitialHistory(emergencyId, userId, now);
+        eventPublisher.publishEvent(new EmergencyStatusChangedEvent(emergencyId, "ACTIVE", now));
+        return new CreationResult(new EmergencyResponse(emergencyId, "ACTIVE", null, now, null, null), true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EmergencyResponse active(AuthenticatedIdentity identity) {
+        UUID userId = requireEnabledUser(identity, false);
+        return repository.findOpenEmergency(userId, false).map(this::response).orElseThrow(ResourceNotFoundException::new);
+    }
+
+    /** Distingue el acceso del propietario del acceso administrativo, que deja registro de auditoría. */
+    @Override
+    @Transactional
+    public EmergencyDetailResponse ownEmergency(AuthenticatedIdentity identity, UUID emergencyId) {
+        if ("ENTITY_ADMIN".equals(identity.role())) {
+            if (repository.findEnabledAdministrator(identity.userId()).isEmpty()) throw new ForbiddenException();
+            EmergencyDetailData emergency = repository.findEmergencyDetail(emergencyId)
+                    .orElseThrow(ResourceNotFoundException::new);
+            UUID ownerUserId = repository.findEmergencyOwner(emergencyId).orElseThrow(ResourceNotFoundException::new);
+            auditService.record(AuditEvent.success(identity.userId(), ownerUserId, "ALERT_VIEWED", "EMERGENCY", emergencyId,
+                    null, null, "Administrative emergency detail viewed."));
+            EmergencyDetailResponse detail = detailResponse(emergency);
+            return new EmergencyDetailResponse(detail.emergencyId(), detail.status(), detail.previousOperationalStatus(),
+                    detail.startedAt(), detail.lastHeartbeatAt(), detail.finalizedAt(), detail.messageSnapshot(),
+                    detail.lastConfirmedLocation(), repository.findOwnerIdentity(emergencyId).orElse(null));
+        }
+        UUID userId = requireEnabledUser(identity, false);
+        return repository.findOwnEmergencyDetail(emergencyId, userId).map(this::detailResponse)
+                .orElseThrow(ResourceNotFoundException::new);
+    }
+
+    @Override
+    @Transactional
+    public void heartbeat(AuthenticatedIdentity identity, UUID emergencyId, LocationInput input) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if ("FINALIZED".equals(emergency.status())) {
+            throw new StateConflictException();
+        }
+        Instant now = clock.instant();
+        if (input != null) {
+            repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(), now);
+        }
+        // Un heartbeat restaura el estado operativo que se conservó al perder conectividad.
+        if ("OFFLINE".equals(emergency.status())) {
+            transition(emergency, emergency.previousOperationalStatus(), null, userId, now, true);
+        } else {
+            repository.updateHeartbeat(emergencyId, emergency.status(), null, now);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void recordLocation(AuthenticatedIdentity identity, UUID emergencyId, LocationInput input) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if (!isOperational(emergency.status())) {
+            throw new StateConflictException();
+        }
+        repository.insertLocation(emergencyId, input.latitude(), input.longitude(), input.accuracyMeters(), input.capturedAt(),
+                clock.instant());
+    }
+
+    @Override
+    @Transactional
+    public void finish(AuthenticatedIdentity identity, UUID emergencyId) {
+        UUID userId = requireEnabledUser(identity, false);
+        EmergencyData emergency = repository.lockOwnEmergency(emergencyId, userId)
+                .orElseThrow(ResourceNotFoundException::new);
+        if ("FINALIZED".equals(emergency.status())) {
+            return;
+        }
+        if (!isOperational(emergency.status())) {
+            throw new StateConflictException();
+        }
+        transition(emergency, "FINALIZED", null, userId, clock.instant(), false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<EmergencyResponse> ownHistory(AuthenticatedIdentity identity, int page, int size) {
+        UUID userId = requireEnabledUser(identity, false);
+        return new PageResponse<>(repository.findOwnFinalizedEmergencies(userId, size, page * size).stream()
+                .map(this::response).toList(), page, size, repository.countOwnFinalizedEmergencies(userId));
+    }
+
+    /** Devuelve false si ya estaba en atención; solo una alerta activa admite esta transición. */
+    @Override
+    @Transactional
+    public boolean startAttention(AuthenticatedIdentity identity, UUID emergencyId) {
+        if (!"ENTITY_ADMIN".equals(identity.role())
+                || repository.findEnabledAdministrator(identity.userId()).isEmpty()) {
+            throw new ForbiddenException();
+        }
+        EmergencyData emergency = repository.lockEmergency(emergencyId).orElseThrow(ResourceNotFoundException::new);
+        if ("IN_PROGRESS".equals(emergency.status())) {
+            return false;
+        }
+        if (!"ACTIVE".equals(emergency.status())) {
+            throw new StateConflictException();
+        }
+        transition(emergency, "IN_PROGRESS", null, identity.userId(), clock.instant(), false);
+        return true;
+    }
+
+    /** Revalida estado y último heartbeat bajo bloqueo antes de marcar una alerta sin conexión. */
+    @Override
+    @Transactional
+    public void markOfflineIfTimedOut(UUID emergencyId) {
+        EmergencyData emergency = repository.lockEmergency(emergencyId).orElse(null);
+        if (emergency == null || !isOperational(emergency.status())) {
+            return;
+        }
+        Instant now = clock.instant();
+        Instant lastActivity = emergency.lastHeartbeatAt() == null ? emergency.startedAt() : emergency.lastHeartbeatAt();
+        if (lastActivity.plusSeconds(configuration.offlineTimeoutSeconds()).isAfter(now)) {
+            return;
+        }
+        transition(emergency, "OFFLINE", emergency.status(), null, now, false);
+    }
+
+    private UUID requireEnabledUser(AuthenticatedIdentity identity, boolean lock) {
+        if (!"USER".equals(identity.role())) {
+            throw new ForbiddenException();
+        }
+        return (lock ? repository.lockEnabledUser(identity.userId()) : repository.findEnabledUser(identity.userId()))
+                .map(EmergencyRepository.UserData::id)
+                .orElseThrow(ForbiddenException::new);
+    }
+
+    // Prioriza el texto recibido, luego la preferencia personal y finalmente el mensaje global.
+    private String effectiveMessage(UUID userId, String requestedMessage) {
+        if (requestedMessage != null) {
+            String normalized = requestedMessage.trim();
+            if (normalized.isBlank()) {
+                throw new RuleViolationException();
+            }
+            return normalized;
+        }
+        return repository.findValidEmergencyMessage(userId).map(String::trim)
+                .filter(message -> !message.isBlank()).orElse(configuration.defaultSosMessage());
+    }
+
+    private EmergencyResponse response(EmergencyData emergency) {
+        return new EmergencyResponse(emergency.id(), emergency.status(), emergency.previousOperationalStatus(),
+                emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt());
+    }
+
+    private EmergencyDetailResponse detailResponse(EmergencyDetailData emergency) {
+        EmergencyLocationResponse location = emergency.latitude() == null ? null : new EmergencyLocationResponse(
+                emergency.latitude(), emergency.longitude(), emergency.accuracyMeters(), emergency.capturedAt(),
+                emergency.receivedAt());
+        return new EmergencyDetailResponse(emergency.id(), emergency.status(), emergency.previousOperationalStatus(),
+                emergency.startedAt(), emergency.lastHeartbeatAt(), emergency.finalizedAt(), emergency.messageSnapshot(), location);
+    }
+
+    /** Actualiza estado e historial con la fila de emergencia previamente bloqueada. */
+    private void transition(EmergencyData emergency, String nextStatus, String previousOperationalStatus,
+            UUID actorUserId, Instant now, boolean updateHeartbeat) {
+        if (nextStatus.equals(emergency.status())) {
+            return;
+        }
+        if (updateHeartbeat) {
+            repository.updateHeartbeat(emergency.id(), nextStatus, previousOperationalStatus, now);
+        } else {
+            repository.updateStatus(emergency.id(), nextStatus, previousOperationalStatus,
+                    "FINALIZED".equals(nextStatus) ? now : null, now);
+        }
+        repository.insertStatusHistory(emergency.id(), repository.nextHistorySequence(emergency.id()), emergency.status(),
+                nextStatus, actorUserId, now);
+        eventPublisher.publishEvent(new EmergencyStatusChangedEvent(emergency.id(), nextStatus, now));
+    }
+
+    private boolean isOperational(String status) {
+        return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status);
+    }
+}
