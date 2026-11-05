@@ -1,0 +1,150 @@
+package com.alertamujer.backend.evidence.service.impl;
+
+import com.alertamujer.backend.evidence.dto.response.EvidenceResponse;
+import com.alertamujer.backend.evidence.repository.EvidenceRepository;
+import com.alertamujer.backend.evidence.repository.EvidenceRepository.EvidenceData;
+import com.alertamujer.backend.evidence.storage.EvidenceStorage;
+import com.alertamujer.backend.evidence.storage.StoredEvidenceFile;
+import com.alertamujer.backend.evidence.service.EvidenceService;
+import com.alertamujer.backend.shared.errors.ForbiddenException;
+import com.alertamujer.backend.shared.errors.ResourceNotFoundException;
+import com.alertamujer.backend.shared.errors.RuleViolationException;
+import com.alertamujer.backend.shared.errors.StateConflictException;
+import com.alertamujer.backend.shared.security.AuthenticatedIdentity;
+import com.alertamujer.backend.shared.config.SystemConfigurationValues;
+import com.alertamujer.backend.shared.audit.AuditEvent;
+import com.alertamujer.backend.shared.audit.AuditService;
+import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+/** Coordina el archivo privado y sus metadatos; intenta retirar el archivo si falla la persistencia. */
+@Service
+class EvidenceServiceImpl implements EvidenceService {
+    private final EvidenceRepository repository;
+    private final EvidenceStorage storage;
+    private final SystemConfigurationValues configuration;
+    private final AuditService auditService;
+    private final Clock clock;
+
+    @Autowired
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration,
+            AuditService auditService) {
+        this(repository, storage, configuration, auditService, Clock.systemUTC());
+    }
+
+    EvidenceServiceImpl(EvidenceRepository repository, EvidenceStorage storage, SystemConfigurationValues configuration,
+            AuditService auditService, Clock clock) {
+        this.repository = repository;
+        this.storage = storage;
+        this.configuration = configuration;
+        this.auditService = auditService;
+        this.clock = clock;
+    }
+
+    @Override
+    @Transactional
+    public EvidenceResponse upload(AuthenticatedIdentity identity, UUID emergencyId, MultipartFile file) {
+        requireUser(identity);
+        // El bloqueo serializa las cargas de la misma emergencia antes de asignar el siguiente número.
+        var emergency = repository.lockOwnedEnabledEmergency(emergencyId, identity.userId())
+                .orElseThrow(ResourceNotFoundException::new);
+        if (!isOperational(emergency.status()) && !"OFFLINE".equals(emergency.status())) throw new StateConflictException();
+        int sequence = repository.nextSequence(emergencyId);
+        if (configuration.maxEvidenceCount() > 0 && sequence > configuration.maxEvidenceCount()) {
+            throw new RuleViolationException();
+        }
+
+        StoredEvidenceFile stored = null;
+        try {
+            stored = storage.store(file);
+            Instant receivedAt = clock.instant();
+            UUID evidenceId = UUID.randomUUID();
+            repository.insert(evidenceId, emergencyId, sequence, stored.reference(), safeOriginalName(file),
+                    file.getContentType(), stored.sizeBytes(), receivedAt);
+            return new EvidenceResponse(evidenceId, "image/webp", stored.sizeBytes(), receivedAt);
+        } catch (IOException exception) {
+            throw new RuleViolationException();
+        } catch (RuntimeException exception) {
+            if (stored != null) storage.deleteAfterPersistenceFailure(stored.reference());
+            throw exception;
+        }
+    }
+
+    @Override
+    @Transactional
+    public List<EvidenceResponse> list(AuthenticatedIdentity identity, UUID emergencyId) {
+        requireReader(identity);
+        if (!repository.hasAuthorizedEmergency(emergencyId, identity.userId(), identity.role())) {
+            throw new ResourceNotFoundException();
+        }
+        List<EvidenceResponse> evidence = repository.findAuthorizedEmergencyEvidence(emergencyId, identity.userId(), identity.role()).stream()
+                .map(this::response).toList();
+        auditAdministrativeAlertAccess(identity, emergencyId, "Administrative emergency evidence list viewed.");
+        return evidence;
+    }
+
+    /** Abre el contenido privado solo tras verificar el acceso a los metadatos. */
+    @Override
+    @Transactional
+    public EvidenceContent content(AuthenticatedIdentity identity, UUID evidenceId) {
+        requireReader(identity);
+        EvidenceData data = repository.findAuthorizedEvidence(evidenceId, identity.userId(), identity.role())
+                .orElseThrow(ResourceNotFoundException::new);
+        try {
+            EvidenceContent content = new EvidenceContent(storage.open(data.reference()), data.sizeBytes());
+            auditAdministrativeAlertAccess(identity, data.emergencyId(), "Administrative emergency evidence content viewed.");
+            return content;
+        } catch (NoSuchFileException exception) {
+            throw new ResourceNotFoundException();
+        } catch (IOException exception) {
+            throw new ResourceNotFoundException();
+        }
+    }
+
+    /** Deja un margen de 24 horas antes de retirar archivos sin referencia en la base de datos. */
+    @Override
+    @Transactional(readOnly = true)
+    public int reconcileOrphans() {
+        return storage.deleteUnreferencedOlderThan(repository.findAllReferences(), clock.instant().minusSeconds(24 * 60 * 60));
+    }
+
+    private void requireUser(AuthenticatedIdentity identity) {
+        if (!"USER".equals(identity.role())) throw new ForbiddenException();
+    }
+
+    private void requireReader(AuthenticatedIdentity identity) {
+        if (!"USER".equals(identity.role()) && !"ENTITY_ADMIN".equals(identity.role())) throw new ForbiddenException();
+    }
+
+    private EvidenceResponse response(EvidenceData data) {
+        return new EvidenceResponse(data.id(), data.mimeType(), data.sizeBytes(), data.receivedAt());
+    }
+
+    private boolean isOperational(String status) {
+        return "ACTIVE".equals(status) || "IN_PROGRESS".equals(status);
+    }
+
+    private void auditAdministrativeAlertAccess(AuthenticatedIdentity identity, UUID emergencyId, String description) {
+        if ("ENTITY_ADMIN".equals(identity.role())) {
+            auditService.record(AuditEvent.success(identity.userId(), null, "ALERT_VIEWED", "EMERGENCY", emergencyId,
+                    null, null, description));
+        }
+    }
+
+    // Conserva solo el nombre final y limita su longitud; nunca lo utiliza como ruta de almacenamiento.
+    private String safeOriginalName(MultipartFile file) {
+        String name = file.getOriginalFilename();
+        if (name == null || name.isBlank()) return null;
+        String normalized = name.replace('\\', '/');
+        normalized = normalized.substring(normalized.lastIndexOf('/') + 1).trim();
+        return normalized.isBlank() ? null : normalized.substring(0, Math.min(normalized.length(), 255));
+    }
+}
